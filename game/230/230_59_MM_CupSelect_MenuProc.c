@@ -195,7 +195,3 @@ void DECOMP_MM_CupSelect_MenuProc(struct RectMenu *menu)
 		DECOMP_RECTMENU_DrawInnerRect(&cupBox, 0, gGT->backBuffer->otMem.startPlusFour);
 	}
 }
-
-#ifdef USE_NEWCUPS
-#include "../AltMods/MM_CustomCups.c"
-#endif

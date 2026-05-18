@@ -28,12 +28,3 @@
 // #include "VehPhysProc_31_SpinStop_PhysAngular.c" //TODO (not needed?)
 #include "VehPhysProc_32_SpinStop_Animate.c"
 #include "VehPhysProc_33_SpinStop_Init.c"
-
-#if defined(USE_ALTMODS)
-#include "../AltMods/Mods5.c"
-
-void __attribute__((section(".end"))) Mods5_EndOfFile()
-{
-	// leave empty
-}
-#endif

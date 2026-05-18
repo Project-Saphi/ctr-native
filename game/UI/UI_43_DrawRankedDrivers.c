@@ -1,5 +1,4 @@
 #include <common.h>
-#include "../AltMods/OnlineCTR/global.h"
 
 // Draw player icons on left side of screen
 // in Arcade mode and Boss mode, and draws

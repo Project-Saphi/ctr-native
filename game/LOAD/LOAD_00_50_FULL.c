@@ -53,14 +53,5 @@
 #include "LOAD_50_IsOpen_Podiums.c"
 
 #ifdef USE_PCDRV
-#include "../AltMods/PCDRV/pcdrv.c"
-#endif
-
-#if defined(USE_ALTMODS)
-#include "../AltMods/Mods4.c"
-
-void __attribute__((section(".end"))) Mods4_EndOfFile()
-{
-	// leave empty
-}
+#include "../PCDRV/pcdrv.c"
 #endif

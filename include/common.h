@@ -3,8 +3,6 @@
 
 // toggle these in decompile
 
-// #define USE_ALTMODS // Enable this before ANY other mods
-
 // 2mb
 // #define USE_16BY9		// Widescreen
 // #define USE_NEW2P		// Requires 16BY9: Side-By-Side 2P
@@ -99,7 +97,6 @@ enum HotReloadSteps
 #define USE_RAMEX
 #define USE_BIGQUEUE
 #define USE_DRIVERLOD
-#define USE_ALTMODS
 
 // note: if you disable this, you'll need to fix anything related to the `ROOM_...` defines in global.h
 #define USE_RETROFUELED // enabled only in certain rooms.
@@ -138,7 +135,7 @@ enum HotReloadSteps
 
 
 #ifdef USE_PCDRV
-#include "AltMods/PCDRV/pcdrv.h"
+#include "PCDRV/pcdrv.h"
 #endif
 
 

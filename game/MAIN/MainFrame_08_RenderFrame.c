@@ -1549,10 +1549,6 @@ __attribute__((optimize("O0"))) int ReadyToBreak(struct GameTracker *gGT)
 	    gGT->vSync_between_drawSync > 6;
 }
 
-#ifdef USE_ONLINE
-#include "../AltMods/OnlineCTR/global.h"
-#endif
-
 void RenderVSYNC(struct GameTracker *gGT)
 {
 	// render checkered flag
@@ -1648,12 +1644,3 @@ void RenderSubmit(struct GameTracker *gGT)
 
 	gGT->frameTimer_notPaused = gGT->frameTimer_VsyncCallback;
 }
-
-#if defined(USE_ALTMODS)
-#include "../AltMods/Mods7.c"
-
-void __attribute__((section(".end"))) Mods7_EndOfFile()
-{
-	// leave empty
-}
-#endif

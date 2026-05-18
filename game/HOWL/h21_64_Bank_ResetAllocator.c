@@ -44,12 +44,3 @@
 #include "h62_UpdateChannelVol_EngineFX_All.c"
 #include "h63_UpdateChannelVol_Music_All.c"
 #include "h64_UpdateChannelVol_OtherFX_All.c"
-
-#if defined(USE_ALTMODS)
-#include "../AltMods/Mods3.c"
-
-void __attribute__((section(".end"))) Mods3_EndOfFile()
-{
-	// leave empty
-}
-#endif

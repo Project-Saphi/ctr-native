@@ -690,12 +690,6 @@ void StateZero()
 	memset(gGT, 0, sizeof(struct GameTracker));
 #endif
 
-#if defined(USE_ALTMODS)
-	// for modding (code caves)
-	void ModsMain();
-	ModsMain();
-#endif
-
 	// Set Video Mode to NTSC
 	SetVideoMode(0);
 	ResetCallback();

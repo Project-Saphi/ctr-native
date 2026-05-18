@@ -17,12 +17,6 @@
 
 #define SquareRoot0_stub   SquareRoot0
 
-#include "game/AltMods/Mods1.c"
-#include "game/AltMods/Mods2.c"
-#include "game/AltMods/Mods3.c"
-#include "game/AltMods/Mods6.c"
-#include "game/AltMods/Mods8.c"
-
 #include "game/MAIN/MAIN_AAA_BigBlock1.c"
 
 #include "game/CAMERA/CAM_01_ClearScreen.c"

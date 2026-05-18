@@ -7,10 +7,6 @@ struct
 } rdata = {0};
 #endif
 
-#ifdef USE_ONLINE
-#include "../AltMods/OnlineCTR/global.h"
-#endif
-
 // used for both finished lap time and current race time
 void DECOMP_UI_DrawRaceClock(u_short paramX, u_short paramY, u_int flags, struct Driver *driver)
 {

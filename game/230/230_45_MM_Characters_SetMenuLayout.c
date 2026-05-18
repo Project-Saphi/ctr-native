@@ -1,9 +1,5 @@
 #include <common.h>
 
-#ifdef USE_OXIDE
-#include "../AltMods/MM_Oxide_IconArrays.c"
-#endif
-
 void DECOMP_MM_Characters_SetMenuLayout(void)
 {
 	unsigned short unlocked;

@@ -1,9 +1,5 @@
 #include <common.h>
 
-#ifdef USE_ONLINE
-#include "../AltMods/OnlineCTR/global.h"
-#endif
-
 enum ItemSet
 {
 	ITEMSET_Race1 = 0,

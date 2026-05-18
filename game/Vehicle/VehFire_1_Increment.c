@@ -1,10 +1,5 @@
 #include <common.h>
 
-#ifdef USE_ONLINE
-#include "../AltMods/OnlineCTR/global.h"
-void FixReservesIncrement(struct Driver *driver, int reserves);
-#endif
-
 // param1 - driver
 // param2 - reserves to add
 // param3 - add type

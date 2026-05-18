@@ -49,7 +49,3 @@ void DECOMP_MM_MenuProc_1p2p(struct RectMenu *menu)
 	}
 	return;
 }
-
-#ifdef USE_HARDER
-#include "../AltMods/MM_HarderSelect.c"
-#endif

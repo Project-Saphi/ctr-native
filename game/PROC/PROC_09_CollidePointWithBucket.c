@@ -1,10 +1,5 @@
 #include <common.h>
 
-#ifdef USE_ONLINE
-#include "../AltMods/OnlineCTR/global.h"
-void Online_CollidePointWithBucket(struct Thread *th, short *vec3_pos);
-#endif
-
 void DECOMP_PROC_CollidePointWithBucket(struct Thread *th, short *vec3_pos)
 {
 	// only used with drivers colliding

@@ -7,12 +7,3 @@
 #include "ElimBG_4_ToggleAllInstances.c"
 #include "ElimBG_5_HandleState.c"
 #include "ElimBG_6_Deactivate.c"
-
-#if defined(USE_ALTMODS)
-#include "../AltMods/Mods6.c"
-
-void __attribute__((section(".end"))) Mods6_EndOfFile()
-{
-	// leave empty
-}
-#endif

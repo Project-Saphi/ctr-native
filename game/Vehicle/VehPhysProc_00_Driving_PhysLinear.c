@@ -1,7 +1,4 @@
 #include <common.h>
-#if defined(USE_ONLINE)
-#include "../AltMods/OnlineCTR/global.h"
-#endif
 
 // budget: 4624
 // curr: 4380

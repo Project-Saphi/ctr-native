@@ -1,9 +1,5 @@
 #include <common.h>
 
-#ifdef USE_ONLINE
-#include "../AltMods/OnlineCTR/global.h"
-#endif
-
 void DECOMP_VehPickupItem_ShootNow(struct Driver *d, int weaponID, int flags)
 {
 	struct Instance *dInst;

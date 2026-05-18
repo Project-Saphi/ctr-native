@@ -2,11 +2,6 @@
 
 typedef void (*VehicleFuncPtr)(struct Thread *thread, struct Driver *driver);
 
-#ifdef USE_ONLINE
-#include "../AltMods/OnlineCTR/global.h"
-void RunVehicleThread(VehicleFuncPtr func, struct Thread *thread, struct Driver *driver);
-#endif
-
 void DECOMP_MainFrame_GameLogic(struct GameTracker *gGT, struct GamepadSystem *gGamepads)
 {
 	char bVar1;

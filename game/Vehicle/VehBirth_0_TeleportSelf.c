@@ -388,12 +388,3 @@ void DECOMP_VehBirth_TeleportSelf(struct Driver *d, u_char spawnFlag, int spawnP
 		d->invisibleTimer = 0x2d00;
 	}
 }
-
-#if defined(USE_ALTMODS)
-#include "../AltMods/Mods9.c"
-
-void __attribute__((section(".end"))) Mods9_EndOfFile()
-{
-	// leave empty
-}
-#endif

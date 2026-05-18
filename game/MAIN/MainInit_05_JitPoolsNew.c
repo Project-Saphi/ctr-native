@@ -71,15 +71,6 @@ void DECOMP_MainInit_JitPoolsNew(struct GameTracker *gGT)
 #endif
 
 
-// 2mb RAM, decomp/General, ram holes
-#if !defined(REBUILD_PS1) && !defined(USE_RAMEX) && defined(USE_ALTMODS)
-	// saves 0x1B00 bytes
-	void RelocMemory_DefragUI_Mods1_ThreadPool();
-	int backup = (int)sdata->mempack[0].firstFreeByte;
-	sdata->mempack[0].firstFreeByte = (void *)RelocMemory_DefragUI_Mods1_ThreadPool;
-#endif
-
-
 	// normally maxed at 96
 	int numThread = uVar9 * 3 >> 7;
 
@@ -88,14 +79,6 @@ void DECOMP_MainInit_JitPoolsNew(struct GameTracker *gGT)
 
 #ifdef CTR_INTERNAL
 	fprintf(stderr, "  thread:       %3d items x 0x%X bytes\n", numThread, (unsigned)sizeof(struct Thread));
-#endif
-
-
-// 2mb RAM, decomp/General, ram holes
-// 8000F000 - 8000F820 to MediumStackPool
-// 8000F820 - 8000FFF0 to $sp stack memory
-#if !defined(REBUILD_PS1) && !defined(USE_RAMEX) && defined(USE_ALTMODS)
-	sdata->mempack[0].firstFreeByte = (void *)0x8000F000;
 #endif
 
 
@@ -112,25 +95,6 @@ void DECOMP_MainInit_JitPoolsNew(struct GameTracker *gGT)
 #endif
 
 
-// 2mb RAM, decomp/General, ram holes
-#if !defined(REBUILD_PS1) && !defined(USE_RAMEX) && defined(USE_ALTMODS)
-	sdata->mempack[0].firstFreeByte = (void *)backup;
-
-	if (
-	    // override, only if 3P4P VS
-	    (gGT->numPlyrCurrGame > 2) &&
-
-	    // main menu is "4p" dont corruput 1p overlay
-	    (gGT->levelID != MAIN_MENU_LEVEL))
-	{
-		void OVR_Region3();
-		unsigned int addrSmallPool = (unsigned int)OVR_Region3;
-		addrSmallPool -= 6500;
-		sdata->mempack[0].firstFreeByte = (void *)addrSmallPool;
-	}
-#endif
-
-
 	// normally maxed at 100
 	int numSmall = uVar7 * 0x19 >> 10;
 
@@ -141,20 +105,6 @@ void DECOMP_MainInit_JitPoolsNew(struct GameTracker *gGT)
 
 #ifdef CTR_INTERNAL
 	fprintf(stderr, "  smallStack:   %3d items x 0x%X bytes\n", numSmall, 72);
-#endif
-
-
-// 2mb RAM, decomp/General, ram holes
-#if !defined(REBUILD_PS1) && !defined(USE_RAMEX) && defined(USE_ALTMODS)
-	if (
-	    // override, only if 3P4P VS
-	    (gGT->numPlyrCurrGame > 2) &&
-
-	    // main menu is "4p" dont corruput 1p overlay
-	    (gGT->levelID != MAIN_MENU_LEVEL))
-	{
-		sdata->mempack[0].firstFreeByte = (void *)backup;
-	}
 #endif
 
 

@@ -8,12 +8,3 @@
 #include "MainFrame_00_TogglePauseAudio.c"
 #include "MainFrame_01_ResetDB.c"
 #include "MainFrame_02_GameLogic.c"
-
-#if defined(USE_ALTMODS)
-#include "../AltMods/ModsA.c"
-
-void __attribute__((section(".end"))) ModsA_EndOfFile()
-{
-	// leave empty
-}
-#endif

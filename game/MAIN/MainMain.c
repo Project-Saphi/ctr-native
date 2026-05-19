@@ -386,31 +386,16 @@ u_int DECOMP_main()
 			gGT->vSync_between_drawSync = 0;
 
 
-// temporary, no camera thread yet
-#ifdef REBUILD_PS1
+// NOTE(aalhendi): Native-only temporary camera/debug shim. This is not retail.
+// Keep it away from verified cutscene routes so overlay code owns the camera.
+#if defined(REBUILD_PS1) && defined(CTR_NATIVE)
 
 			gGT->hudFlags &= 0xfe;
 			if (gGT->levelID < GLACIER_PARK)
 				gGT->hudFlags |= 1;
 
-			if ((gGT->level1 != 0) && // for ND Box
-			    (gGT->levelID != MAIN_MENU_LEVEL) && (gGT->levelID != ADVENTURE_GARAGE))
+			if ((gGT->level1 != 0) && (gGT->levelID != MAIN_MENU_LEVEL) && (gGT->levelID != ADVENTURE_GARAGE) && (gGT->levelID != NAUGHTY_DOG_CRATE))
 			{
-				// placeholder until 233 is done
-				if (gGT->levelID == NAUGHTY_DOG_CRATE)
-				{
-					gGT->pushBuffer[0].pos[0] = 0;
-					gGT->pushBuffer[0].pos[1] = 0x1c2;
-					gGT->pushBuffer[0].pos[2] = 0x1dd;
-					gGT->pushBuffer[0].rot[0] = 0x7dd;
-					gGT->pushBuffer[0].rot[1] = 0;
-					gGT->pushBuffer[0].rot[2] = 0;
-
-					// wait 5 seconds
-					if (gGT->timer > 30 * 5)
-						DECOMP_MainRaceTrack_RequestLoad(MAIN_MENU_LEVEL);
-				}
-
 				int tap = gGS->gamepad[0].buttonsTapped;
 				int held = gGS->gamepad[0].buttonsHeldCurrFrame;
 

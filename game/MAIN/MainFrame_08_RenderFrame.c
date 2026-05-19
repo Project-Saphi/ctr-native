@@ -112,6 +112,8 @@ void DECOMP_MainFrame_RenderFrame(struct GameTracker *gGT, struct GamepadSystem 
 
 #else
 
+	// TODO(aalhendi): Remove this native test renderer and route ctr-native
+	// through the retail RenderBucket queue/execute path.
 	// PC port version of ExecuteAllInstances
 	if ((gGT->renderFlags & 0x20) != 0)
 	{

@@ -13,6 +13,7 @@ static const unsigned char cs_opcodeMeta[256] = {
     0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x27, 0x00, 0x00, 0x13, 0x20, 0x02, 0x2a, 0x30, 0x00, 0x00, 0x28, 0x00, 0xff, 0x00,
 };
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800abf70-0x800abf9c
 static short CS_ScriptCmd_ReadOpcode_GetShort(char **Opcodes)
 {
 	char *bytes = *Opcodes;
@@ -21,6 +22,7 @@ static short CS_ScriptCmd_ReadOpcode_GetShort(char **Opcodes)
 	return result;
 }
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800abf9c-0x800abfd8
 static u_int CS_ScriptCmd_ReadOpcode_GetInt(char **Opcodes)
 {
 	char *bytes = *Opcodes;
@@ -28,6 +30,7 @@ static u_int CS_ScriptCmd_ReadOpcode_GetInt(char **Opcodes)
 	return (unsigned char)bytes[3] << 24 | (unsigned char)bytes[2] << 16 | (unsigned char)bytes[1] << 8 | (unsigned char)bytes[0];
 }
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800abfd8-0x800ac014
 static u_int CS_ScriptCmd_ReadOpcode_GetInt_dup(char **Opcodes)
 {
 	char *bytes = *Opcodes;
@@ -104,6 +107,7 @@ static void CS_ScriptCmd_ReadOpcode_Main(struct CutsceneObj *cs)
 	cs->prevOpcode = local_cursor;
 }
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800ac1c0-0x800ac1ec
 void DECOMP_CS_ScriptCmd_OpcodeNext(struct CutsceneObj *cs)
 {
 	char *prev = cs->prevOpcode;
@@ -112,6 +116,7 @@ void DECOMP_CS_ScriptCmd_OpcodeNext(struct CutsceneObj *cs)
 	CS_ScriptCmd_ReadOpcode_Main(cs);
 }
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800ac1ec-0x800ac214
 void DECOMP_CS_ScriptCmd_OpcodeAt(struct CutsceneObj *cs, char *opCodeAt)
 {
 	cs->currOpcode[0] = opCodeAt;

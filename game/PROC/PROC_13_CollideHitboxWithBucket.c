@@ -5,6 +5,7 @@ static s32 DECOMP_PROC_CollideHitbox_MipsSquare(s32 value)
 	return (s32)(u32)((s64)value * (s64)value);
 }
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800425d4-0x800426f8
 void DECOMP_PROC_CollideHitboxWithBucket(struct Thread *collThread, struct ScratchpadStruct *sps, struct Thread *ignoredThread)
 {
 	s32 distX;

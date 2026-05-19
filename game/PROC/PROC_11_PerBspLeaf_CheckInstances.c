@@ -5,6 +5,7 @@ static s32 DECOMP_PROC_PerBspLeaf_MipsSquare(s32 value)
 	return (s32)(u32)((s64)value * (s64)value);
 }
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800423fc-0x80042544
 void DECOMP_PROC_PerBspLeaf_CheckInstances(struct BSP *bspLeaf, struct ScratchpadStruct *sps)
 {
 	s32 distX;

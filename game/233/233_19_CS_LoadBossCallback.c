@@ -1,6 +1,6 @@
 #include <common.h>
 
-// ASM-verified: 0x800ae81c, 20 bytes, leaf function
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800ae81c-0x800ae834
 void DECOMP_CS_LoadBossCallback(struct LoadQueueSlot *lqs)
 {
 	void *ptr = lqs->ptrDestination;

@@ -1,5 +1,6 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x80042544-0x800425d4
 void DECOMP_PROC_StartSearch_Self(struct ScratchpadStruct *sps)
 {
 	short hitRadius;

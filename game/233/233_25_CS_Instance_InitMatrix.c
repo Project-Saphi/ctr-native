@@ -1,5 +1,6 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800ac214-0x800ac320
 void DECOMP_CS_Instance_InitMatrix(void)
 {
 	if (OVR_233.cs_initMatrixBool != 0)
@@ -8,7 +9,7 @@ void DECOMP_CS_Instance_InitMatrix(void)
 	OVR_233.cs_initMatrixBool = 1;
 
 	MATRIX mat;
-	int pos[3];
+	MATRIX scale = {0};
 
 	for (int i = 0; i < 4; i++)
 	{
@@ -24,11 +25,11 @@ void DECOMP_CS_Instance_InitMatrix(void)
 
 			ConvertRotToMatrix(&mat, (short *)(entry + 8));
 
-			pos[0] = *(short *)(entry + 0x10);
-			pos[1] = *(short *)(entry + 0x12);
-			pos[2] = *(short *)(entry + 0x14);
+			scale.m[0][0] = *(short *)(entry + 0x10);
+			scale.m[1][1] = *(short *)(entry + 0x12);
+			scale.m[2][2] = *(short *)(entry + 0x14);
 
-			MatrixRotate((MATRIX *)(entry + 8), (short *)pos, &mat);
+			MatrixRotate((MATRIX *)(entry + 8), &scale, &mat);
 		}
 	}
 }

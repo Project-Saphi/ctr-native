@@ -1,6 +1,6 @@
 #include <common.h>
 
-// ASM-verified: 0x800b8810-0x800b885c
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800b8810-0x800b885c
 char *CS_Credits_GetNextString(char *str)
 {
 	char c = *str;

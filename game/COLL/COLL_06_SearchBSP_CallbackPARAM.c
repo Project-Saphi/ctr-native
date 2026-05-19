@@ -30,6 +30,7 @@ static void DECOMP_COLL_SearchBSP_CallbackPARAM_VisitChild(struct BSP *root, uns
 	DECOMP_COLL_SearchBSP_CallbackPARAM_VisitChild(root, (unsigned short)child->data.branch.childID[0], minX, minY, minZ, maxX, maxY, maxZ, callback, param);
 }
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8001ebec-0x8001ede4
 void DECOMP_COLL_SearchBSP_CallbackPARAM(struct BSP *root, struct BoundingBox *bbox, void (*callback)(struct BSP *, struct ScratchpadStruct *),
                                          struct ScratchpadStruct *param)
 {

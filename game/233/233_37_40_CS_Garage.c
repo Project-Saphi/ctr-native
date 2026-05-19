@@ -526,6 +526,7 @@ SKIP_CONTROLS:
 	gGT->pushBuffer[0].distanceToScreen_PREV = zoom;
 }
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800b854c-0x800b8558
 struct RectMenu *DECOMP_CS_Garage_GetMenuPtr(void)
 {
 	return &gGarage.menuGarage;

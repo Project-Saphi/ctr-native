@@ -516,7 +516,10 @@ struct CreditsObj
 	} data_0x18_0x5[5];
 
 	// 800b97dc (320)
-	int countdown;
+	short countdown;
+
+	// 800b97de (322)
+	short unused_322;
 
 	// 800b97e0 (324)
 	int unk;
@@ -525,7 +528,10 @@ struct CreditsObj
 	struct Instance *creditDanceInst; // base for copies
 
 	// 800b97e8 (32c)
-	int credits_posY;
+	short credits_posY;
+
+	// 800b97ea (32e)
+	short unused_32e;
 
 	// 800b97ec (330)
 	char *credits_topString;
@@ -542,6 +548,13 @@ struct CreditsObj
 	// 800b97fa (33e)
 	short epiloguePosX; // unused
 };
+
+#ifndef REBUILD_PC
+_Static_assert(OFFSETOF(struct CreditsObj, countdown) == 0x320);
+_Static_assert(OFFSETOF(struct CreditsObj, credits_posY) == 0x32c);
+_Static_assert(OFFSETOF(struct CreditsObj, credits_topString) == 0x330);
+_Static_assert(sizeof(struct CreditsObj) == 0x340);
+#endif
 
 struct Ovr233_Credits_BSS
 {

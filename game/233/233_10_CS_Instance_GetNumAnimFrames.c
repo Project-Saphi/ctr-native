@@ -1,5 +1,6 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800ac5a4-0x800ac638
 int DECOMP_CS_Instance_GetNumAnimFrames(struct Instance *modelInst, int animIndex, int LOD)
 {
 	struct Model *model;
@@ -17,8 +18,13 @@ int DECOMP_CS_Instance_GetNumAnimFrames(struct Instance *modelInst, int animInde
 		return 0;
 
 	header = &model->headers[LOD];
+	if (header == NULL)
+		return 0;
 
 	if (animIndex >= header->numAnimations)
+		return 0;
+
+	if (header->ptrAnimations == NULL)
 		return 0;
 
 	anim = header->ptrAnimations[animIndex];

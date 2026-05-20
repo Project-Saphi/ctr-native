@@ -122,8 +122,11 @@ void DECOMP_MainFrame_RenderFrame(struct GameTracker *gGT, struct GamepadSystem 
 	RenderBucket_ExecuteAllInstances(gGT);
 #endif
 
-#ifndef REBUILD_PS1
+#if !defined(REBUILD_PS1) || defined(CTR_NATIVE)
 	RenderAllTires(gGT);
+#endif
+
+#ifndef REBUILD_PS1
 	RenderAllShadows(gGT);
 	RenderAllHeatParticles(gGT);
 
@@ -806,7 +809,7 @@ void RenderBucket_ExecuteAllInstances(struct GameTracker *gGT)
 }
 #endif
 
-#ifndef REBUILD_PS1
+#if !defined(REBUILD_PS1) || defined(CTR_NATIVE)
 void RenderAllTires(struct GameTracker *gGT)
 {
 	int i;
@@ -834,7 +837,9 @@ void RenderAllTires(struct GameTracker *gGT)
 		DrawTires_Reflection(th, gGT_primMem, numPlyrCurrGame);
 	}
 }
+#endif
 
+#ifndef REBUILD_PS1
 void RenderAllShadows(struct GameTracker *gGT)
 {
 	if ((gGT->renderFlags & 0x200) == 0)

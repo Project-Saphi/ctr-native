@@ -19,6 +19,8 @@
 
 #include "game/RenderBucket/RenderBucket_08_InitDepthGTE.c"
 #include "game/RenderBucket/RenderBucket_QueueExecute.c"
+#include "game/RenderTires/DrawTires_Solid.c"
+#include "game/RenderTires/DrawTires_Reflection.c"
 
 #include "game/MAIN/MAIN_AAA_BigBlock1.c"
 

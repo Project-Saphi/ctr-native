@@ -107,15 +107,24 @@ struct PushBuffer
 
 	// 0xF4
 	// u_long* is the type in the psn00b header
+	// NOTE(aalhendi): PSX-backfeed blocker: retail RenderBucket_QueueDraw can
+	// reuse this offset as PUSHBUFFER_EXISTS OT range-start metadata. Native
+	// keeps it as the persistent camera OT pointer until the exact
+	// RenderBucket/PushBuffer ownership handoff is restored.
 	u_long *ptrOT;
 
-	// 0xF8 also OT,
-	// only pixel LOD, what's the difference
-	// between 0xF4 OT and 0xF8 OT?
-
 	// 0xF8
-	// all of filler2 is for pixelLOD only
-	char filler2[0x10];
+	// RenderBucket PUSHBUFFER_EXISTS range end metadata.
+	u_long *renderBucketOTRangeEnd;
+
+	// 0xFC
+	int renderBucketOTByteOffset;
+
+	// 0x100
+	int renderBucketScreenPos;
+
+	// 0x104
+	int renderBucketScreenSize;
 
 	// 0x108
 	int cameraID;

@@ -21,6 +21,16 @@ typedef struct
 	u_char w;
 } RenderBucketVertex;
 
+struct RenderBucketBounds
+{
+	int minX;
+	int maxX;
+	int minY;
+	int maxY;
+	int minZ;
+	int maxZ;
+};
+
 struct RenderBucketDrawContext
 {
 	struct Instance *inst;
@@ -67,16 +77,521 @@ static struct ModelAnim *RenderBucket_GetAnim(struct Instance *inst, struct Mode
 	return mh->ptrAnimations[inst->animIndex];
 }
 
-static struct ModelFrame *RenderBucket_GetFrame(struct Instance *inst, struct ModelHeader *mh, struct ModelAnim **animOut)
+static unsigned int RenderBucket_PackXY(int x, int y)
+{
+	return ((unsigned int)(unsigned short)x) | ((unsigned int)(unsigned short)y << 16);
+}
+
+static int RenderBucket_SignExtendByte(u_char value)
+{
+	return ((value & 0x80) != 0) ? (int)value - 0x100 : value;
+}
+
+static unsigned int RenderBucket_OTAddress(void *ptr)
+{
+	return (unsigned int)ptr & 0xffffff;
+}
+
+static int RenderBucket_ClampOTByteOffset(int depthBin)
+{
+	int byteOffset = depthBin << 2;
+
+	if (depthBin < 0)
+		return 0;
+
+	if (byteOffset > 0xffc)
+		return 0xffc;
+
+	return byteOffset;
+}
+
+static void RenderBucket_BoundsInit(struct RenderBucketBounds *bounds, int sxy, int depth)
+{
+	int x = (short)sxy;
+	int y = (short)(sxy >> 16);
+
+	bounds->minX = x;
+	bounds->maxX = x;
+	bounds->minY = y;
+	bounds->maxY = y;
+	bounds->minZ = depth;
+	bounds->maxZ = depth;
+}
+
+static void RenderBucket_BoundsUpdate(struct RenderBucketBounds *bounds, int sxy, int depth)
+{
+	int x = (short)sxy;
+	int y = (short)(sxy >> 16);
+
+	// NOTE(aalhendi): PSX-backfeed blocker: retail helper 0x80071524 consumes
+	// packed SXY in t1 and depth in t2, then updates t3/t4/t5/t6/t7/s0.
+	// Native uses explicit bounds storage until that register ABI is restored.
+	if (y < bounds->minY)
+		bounds->minY = y;
+	if (y > bounds->maxY)
+		bounds->maxY = y;
+
+	if (x < bounds->minX)
+		bounds->minX = x;
+	if (x > bounds->maxX)
+		bounds->maxX = x;
+
+	if (depth < bounds->minZ)
+		bounds->minZ = depth;
+	if (depth > bounds->maxZ)
+		bounds->maxZ = depth;
+}
+
+static void RenderBucket_ProjectBoundsPoint(struct RenderBucketBounds *bounds, int x, int y, int z, int firstPoint)
+{
+	SVECTOR point;
+	int sxy;
+	int depth;
+
+	point.vx = x;
+	point.vy = y;
+	point.vz = z;
+	point.pad = 0;
+
+	gte_ldv0(&point);
+	gte_rtps();
+	gte_stsxy0(&sxy);
+	gte_stsz(&depth);
+
+	if (firstPoint != 0)
+		RenderBucket_BoundsInit(bounds, sxy, depth);
+	else
+		RenderBucket_BoundsUpdate(bounds, sxy, depth);
+}
+
+static int RenderBucket_ProjectFrameBounds(struct ModelFrame *frame, struct PushBuffer *pb, struct InstDrawPerPlayer *idpp, struct RenderBucketBounds *bounds)
+{
+	int minX = ((int)frame->pos[0]) << 2;
+	int minY = ((int)frame->pos[1]) << 2;
+	int minZ = ((int)frame->pos[2]) << 2;
+	int maxX = minX + 0x3fc;
+	int maxY = minY + 0x3fc;
+	int maxZ = minZ + 0x3fc;
+
+	// NOTE(aalhendi): PSX-backfeed blocker: retail QueueDraw projects frame
+	// bounds through live GTE state at 0x80071054-0x80071164 and folds them with
+	// helper 0x80071524. Native uses the queued MVP and explicit bounds storage
+	// until the exact register sequence is restored.
+	gte_SetRotMatrix(&idpp->mvp);
+	gte_SetTransMatrix(&idpp->mvp);
+	gte_SetGeomOffset(pb->rect.w >> 1, pb->rect.h >> 1);
+	gte_SetGeomScreen(pb->distanceToScreen_PREV);
+
+	RenderBucket_ProjectBoundsPoint(bounds, minX, minY, minZ, 1);
+	RenderBucket_ProjectBoundsPoint(bounds, maxX, minY, minZ, 0);
+	RenderBucket_ProjectBoundsPoint(bounds, maxX, maxY, minZ, 0);
+	RenderBucket_ProjectBoundsPoint(bounds, minX, maxY, minZ, 0);
+	RenderBucket_ProjectBoundsPoint(bounds, minX, minY, maxZ, 0);
+	RenderBucket_ProjectBoundsPoint(bounds, maxX, minY, maxZ, 0);
+	RenderBucket_ProjectBoundsPoint(bounds, maxX, maxY, maxZ, 0);
+	RenderBucket_ProjectBoundsPoint(bounds, minX, maxY, maxZ, 0);
+
+	if (bounds->maxX < 0)
+		return 0;
+
+	if (bounds->maxY < 0)
+		return 0;
+
+	if (bounds->maxZ < 0)
+		return 0;
+
+	if (bounds->minX > pb->rect.w)
+		return 0;
+
+	if (bounds->minY > pb->rect.h)
+		return 0;
+
+	return 1;
+}
+
+static int RenderBucket_GetViewDepth(struct Instance *inst, struct PushBuffer *pb)
+{
+	VECTOR pos;
+	VECTOR viewPos;
+
+	// NOTE(aalhendi): PSX-backfeed blocker: retail QueueDraw derives this
+	// camera-relative depth from scratchpad/GTE register state at
+	// 0x80070a1c-0x80070ae0. Native keeps the same ViewProj input explicit
+	// until the full QueueLev/QueueNonLev scratchpad entry protocol is restored.
+	if ((inst->flags & SCREENSPACE_INSTANCE) != 0)
+		return inst->matrix.t[2];
+
+	pos.vx = inst->matrix.t[0] - pb->matrix_Camera.t[0];
+	pos.vy = inst->matrix.t[1] - pb->matrix_Camera.t[1];
+	pos.vz = inst->matrix.t[2] - pb->matrix_Camera.t[2];
+	ApplyMatrixLV(&pb->matrix_ViewProj, &pos, &viewPos);
+
+	return viewPos.vz;
+}
+
+static struct ModelHeader *RenderBucket_SelectModelHeader(struct Instance *inst, struct PushBuffer *pb, int *lodIndexOut, int *viewDepthOut)
+{
+	struct ModelHeader *mh;
+	int viewDepth;
+	int projectedDistance;
+
+	*lodIndexOut = 0;
+	*viewDepthOut = 0;
+
+	if (inst->model->numHeaders <= 0)
+		return 0;
+
+	if (pb->distanceToScreen_PREV == 0)
+		return 0;
+
+	viewDepth = RenderBucket_GetViewDepth(inst, pb);
+	*viewDepthOut = viewDepth;
+	// NOTE(aalhendi): Retail keeps the low 32 bits of this product before dividing by GTE H.
+	projectedDistance = (int)(unsigned int)((long long)(pb->rect.w >> 1) * viewDepth) / pb->distanceToScreen_PREV;
+	mh = inst->model->headers;
+
+	// NOTE(aalhendi): PSX-backfeed blocker: retail LOD selection at
+	// 0x80070ae4-0x80070b34 uses transformed GTE depth in scratchpad 0x8c,
+	// divides by GTE H, and walks ModelHeader entries through s4/s5. Native C
+	// preserves the projected-distance comparison explicitly until the register
+	// walk is restored.
+	for (int lodIndex = 0; lodIndex < inst->model->numHeaders; lodIndex++, mh++)
+	{
+		if ((projectedDistance - (unsigned short)mh->maxDistanceLOD) < 0)
+		{
+			*lodIndexOut = lodIndex;
+			return mh;
+		}
+	}
+
+	return 0;
+}
+
+static void RenderBucket_GteLoadRotMatrixWords(unsigned int m0, unsigned int m1, unsigned int m2, unsigned int m3, unsigned int m4)
+{
+	CTC2(m0, 0);
+	CTC2(m1, 1);
+	CTC2(m2, 2);
+	CTC2(m3, 3);
+	CTC2(m4, 4);
+}
+
+static void RenderBucket_GteScaleMatrixColumns(unsigned int *m0, unsigned int *m1, unsigned int *m2, unsigned int *m3, unsigned int *m4)
+{
+	unsigned int v0;
+	unsigned int v1;
+	unsigned int v2;
+	unsigned int t0;
+	unsigned int t1;
+	unsigned int t2;
+	unsigned int t3;
+	unsigned int t4;
+
+	// NOTE(aalhendi): PSX-backfeed blocker: retail helper 0x8006c49c consumes
+	// matrix words through t3/t4/t5/t6/t7 and live GTE color/rotation state.
+	// Native mirrors the opcode sequence with explicit C parameters until that
+	// register-entry ABI is restored.
+	MTC2((*m0 & 0xffff) | (*m1 & 0xffff0000), 0);
+	MTC2(*m3, 1);
+	doCOP2(0x0486012);
+
+	MTC2((*m0 >> 16) | (*m2 << 16), 2);
+	MTC2(*m3 >> 16, 3);
+	t0 = MFC2(9);
+	t1 = MFC2(10);
+	t3 = MFC2(11);
+	doCOP2(0x048e012);
+
+	MTC2((*m1 & 0xffff) | (*m2 & 0xffff0000), 4);
+	MTC2(*m4, 5);
+	t0 &= 0xffff;
+	t1 <<= 16;
+	t3 &= 0xffff;
+
+	v0 = MFC2(9);
+	v1 = MFC2(10);
+	v2 = MFC2(11);
+	doCOP2(0x0496012);
+
+	v0 <<= 16;
+	*m0 = t0 | v0;
+	v1 &= 0xffff;
+	v2 <<= 16;
+	*m3 = t3 | v2;
+
+	v0 = MFC2(9);
+	t2 = MFC2(10);
+	t4 = MFC2(11);
+	v0 &= 0xffff;
+	*m1 = t1 | v0;
+	t2 <<= 16;
+	*m2 = v1 | t2;
+	*m4 = t4;
+
+	RenderBucket_GteLoadRotMatrixWords(*m0, *m1, *m2, *m3, *m4);
+}
+
+static int RenderBucket_GetScaledMatrixElem(struct Instance *inst, int scale[3], int row, int col)
+{
+	return (inst->matrix.m[row][col] * scale[col]) >> 8;
+}
+
+static void RenderBucket_BuildM3x3(struct Instance *inst, struct ModelHeader *mh, int viewDepth, struct InstDrawPerPlayer *idpp)
+{
+	unsigned int m0;
+	unsigned int m1;
+	unsigned int m2;
+	unsigned int m3;
+	unsigned int m4;
+	unsigned int packedScaleXY;
+	int depthShift;
+	int scaleXYShift;
+	int scaleZShift;
+	int scaleX;
+	int scaleY;
+	int scaleZ;
+
+	// NOTE(aalhendi): PSX-backfeed blocker: retail QueueDraw produces IDPP
+	// m3x3 at 0x80070b38-0x80070c18 by loading the instance matrix through
+	// t3/t4/t5/t6/t7, setting the GTE color matrix from ModelHeader scale, then
+	// calling helper 0x8006c49c. Native preserves the same field and GTE helper
+	// sequence through explicit C parameters until the exact register/scratchpad
+	// boundary is restored.
+	// NOTE(aalhendi): Retail treats MATRIX halfwords as packed GTE register words here.
+	m0 = *(unsigned int *)&inst->matrix.m[0][0];
+	m1 = *(unsigned int *)&inst->matrix.m[0][2];
+	m2 = *(unsigned int *)&inst->matrix.m[1][1];
+	m3 = *(unsigned int *)&inst->matrix.m[2][0];
+	m4 = *(unsigned int *)&inst->matrix.m[2][2];
+	RenderBucket_GteLoadRotMatrixWords(m0, m1, m2, m3, m4);
+
+	depthShift = (viewDepth < 0x1000) ? 2 : 0;
+	scaleXYShift = 0x12 - depthShift;
+	scaleZShift = 2 - depthShift;
+	packedScaleXY = *(unsigned int *)&mh->scale[0];
+
+	CTC2((packedScaleXY << 16) >> scaleXYShift, 16);
+	CTC2(0, 17);
+	CTC2(packedScaleXY >> scaleXYShift, 18);
+	CTC2(0, 19);
+	CTC2((unsigned short)mh->scale[2] >> scaleZShift, 20);
+
+	scaleX = inst->scale[0];
+	scaleY = inst->scale[1];
+	scaleZ = inst->scale[2];
+	if ((inst->flags & PIXEL_LOD) != 0)
+	{
+		int pixelScale = (viewDepth >> 1) + 0x1000;
+
+		scaleX = (pixelScale * scaleX) >> 12;
+		scaleY = (pixelScale * scaleY) >> 12;
+		scaleZ = (pixelScale * scaleZ) >> 12;
+	}
+
+	MTC2(RenderBucket_PackXY(scaleX, scaleY), 0);
+	MTC2(scaleZ, 1);
+	doCOP2(0x04c6012);
+
+	RenderBucket_GteScaleMatrixColumns(&m0, &m1, &m2, &m3, &m4);
+	*(unsigned int *)&idpp->m3x3.m[0][0] = m0;
+	*(unsigned int *)&idpp->m3x3.m[0][2] = m1;
+	*(unsigned int *)&idpp->m3x3.m[1][1] = m2;
+	*(unsigned int *)&idpp->m3x3.m[2][0] = m3;
+	*(unsigned int *)&idpp->m3x3.m[2][2] = m4;
+}
+
+static void RenderBucket_BuildMvp(struct Instance *inst, struct ModelHeader *mh, struct PushBuffer *pb, MATRIX *mvp)
+{
+	int scale[3];
+	VECTOR pos;
+
+	// NOTE(aalhendi): PSX-backfeed blocker: retail QueueDraw owns IDPP matrix
+	// production in 0x80070b38-0x80071054 through MATRIX_SET/FUN_8006c49c/
+	// FUN_8006c558 and live GTE register state. Native currently preserves MVP
+	// producer ownership with explicit C math; restore the exact GTE helper
+	// choreography before PSX backfeed or an ASM-verified stamp.
+	scale[0] = (mh->scale[0] * inst->scale[0]) >> 12;
+	scale[1] = (mh->scale[1] * inst->scale[1]) >> 12;
+	scale[2] = (mh->scale[2] * inst->scale[2]) >> 12;
+
+#define RB_MVP(row, col, index) ((pb->matrix_ViewProj.m[row][index] * RenderBucket_GetScaledMatrixElem(inst, scale, index, col)) >> 0x10)
+
+	mvp->m[0][0] = RB_MVP(0, 0, 0) + RB_MVP(0, 0, 1) + RB_MVP(0, 0, 2);
+	mvp->m[0][1] = RB_MVP(0, 1, 0) + RB_MVP(0, 1, 1) + RB_MVP(0, 1, 2);
+	mvp->m[0][2] = RB_MVP(0, 2, 0) + RB_MVP(0, 2, 1) + RB_MVP(0, 2, 2);
+	mvp->m[1][0] = RB_MVP(1, 0, 0) + RB_MVP(1, 0, 1) + RB_MVP(1, 0, 2);
+	mvp->m[1][1] = RB_MVP(1, 1, 0) + RB_MVP(1, 1, 1) + RB_MVP(1, 1, 2);
+	mvp->m[1][2] = RB_MVP(1, 2, 0) + RB_MVP(1, 2, 1) + RB_MVP(1, 2, 2);
+	mvp->m[2][0] = RB_MVP(2, 0, 0) + RB_MVP(2, 0, 1) + RB_MVP(2, 0, 2);
+	mvp->m[2][1] = RB_MVP(2, 1, 0) + RB_MVP(2, 1, 1) + RB_MVP(2, 1, 2);
+	mvp->m[2][2] = RB_MVP(2, 2, 0) + RB_MVP(2, 2, 1) + RB_MVP(2, 2, 2);
+
+#undef RB_MVP
+
+	pos.vx = inst->matrix.t[0] - pb->matrix_Camera.t[0];
+	pos.vy = inst->matrix.t[1] - pb->matrix_Camera.t[1];
+	pos.vz = inst->matrix.t[2] - pb->matrix_Camera.t[2];
+
+	ApplyMatrixLV(&pb->matrix_ViewProj, &pos, &mvp->t[0]);
+}
+
+static u_long *RenderBucket_AllocateOTRange(struct OTMem *otMem, struct PushBuffer *pb, int minDepth, int maxDepth, int viewDepth, int depthBias,
+                                            int usePushBuffer)
+{
+	u_long *rangeStart;
+	u_long *rangeEnd;
+	u_long *newCurr;
+	u_long *otSlot;
+	int range;
+	int byteOffset;
+
+	if (otMem == 0)
+		return 0;
+
+	if (pb->ptrOT == 0)
+		return 0;
+
+	range = maxDepth - minDepth;
+	if (range < 0)
+		return 0;
+
+	rangeStart = otMem->curr;
+	rangeEnd = rangeStart + range;
+	newCurr = rangeEnd + 1;
+
+	if (newCurr >= (otMem->end - 1))
+		return 0;
+
+	// NOTE(aalhendi): PSX-backfeed blocker: retail QueueDraw links per-instance
+	// OT ranges by writing raw 24-bit primitive tags at 0x80071218-0x800712f4.
+	// Native uses the same tag-chain shape with explicit C pointer masking.
+	otMem->curr = newCurr;
+
+	byteOffset = RenderBucket_ClampOTByteOffset((viewDepth >> 6) + depthBias);
+
+	if (usePushBuffer != 0)
+	{
+		// NOTE(aalhendi): PSX-backfeed blocker: retail QueueDraw stores the
+		// range start/end/byte-offset metadata at PushBuffer 0xf4/0xf8/0xfc for
+		// PUSHBUFFER_EXISTS instances. Native keeps 0xf4 as ptrOT until
+		// DrawInstPrim/PushBuffer ownership is restored, so the range start is
+		// held by IDPP unkE4 and the extra metadata is stored in named fields.
+		rangeStart[0] = 0;
+		pb->renderBucketOTRangeEnd = rangeEnd;
+		pb->renderBucketOTByteOffset = byteOffset;
+	}
+	else
+	{
+		otSlot = (u_long *)((char *)pb->ptrOT + byteOffset);
+		rangeStart[0] = otSlot[0];
+		otSlot[0] = RenderBucket_OTAddress(rangeEnd);
+	}
+
+	for (u_long *entry = rangeStart; entry != rangeEnd; entry++)
+	{
+		entry[1] = RenderBucket_OTAddress(entry);
+	}
+
+	return rangeStart - minDepth;
+}
+
+static void RenderBucket_UpdatePushBufferMetadata(struct PushBuffer *pb, const struct RenderBucketBounds *bounds, unsigned int *instFlags)
+{
+	int width;
+	int height;
+
+	if ((*instFlags & PUSHBUFFER_EXISTS) == 0)
+		return;
+
+	// NOTE(aalhendi): PSX-backfeed blocker: retail QueueDraw writes projected
+	// screen pos/size to PushBuffer 0x100/0x104 and clears PUSHBUFFER_EXISTS
+	// when the projected bounds exceed the small-buffer constraints at
+	// 0x80071164-0x800711c8. Native mirrors the dataflow explicitly until the
+	// exact scratchpad/register path is restored.
+	width = bounds->maxX - bounds->minX;
+	height = bounds->maxY - bounds->minY;
+	pb->renderBucketScreenPos = RenderBucket_PackXY(bounds->minX, bounds->minY);
+	pb->renderBucketScreenSize = RenderBucket_PackXY(width, height);
+
+	if (bounds->minX < 0 || bounds->minY < 0 || height > 0x40 || width > 0x60 || bounds->maxX >= pb->rect.w || bounds->maxY >= pb->rect.h)
+	{
+		*instFlags &= ~PUSHBUFFER_EXISTS;
+	}
+}
+
+static int RenderBucket_ShouldAllocateSecondaryRange(unsigned int instFlags)
+{
+	if ((instFlags & PUSHBUFFER_EXISTS) != 0)
+		return 0;
+
+	if ((instFlags & REFLECTIVE) != 0)
+		return 1;
+
+	// NOTE(aalhendi): PSX-backfeed blocker: retail QueueDraw can also allocate
+	// the secondary OT range for SPLIT_LINE when scratchpad words 0x68/0x6c
+	// were produced by the earlier split-line matrix path. Native does not
+	// source-back that side-effect path yet, so only the unconditional
+	// reflective branch is represented here.
+	return 0;
+}
+
+static int RenderBucket_BuildDepthRange(struct Instance *inst, struct ModelFrame *frame, struct PushBuffer *pb, struct InstDrawPerPlayer *idpp,
+                                        struct OTMem *otMem, int viewDepth, unsigned int *instFlags)
+{
+	struct RenderBucketBounds bounds;
+	u_long *secondaryRange;
+	int minDepth;
+	int maxDepth;
+
+	if (RenderBucket_ProjectFrameBounds(frame, pb, idpp, &bounds) == 0)
+		return 0;
+
+	RenderBucket_UpdatePushBufferMetadata(pb, &bounds, instFlags);
+	minDepth = (bounds.minZ >> 5) - 2;
+	maxDepth = (bounds.maxZ >> 5) + 1;
+
+	idpp->depthOffset[0] = minDepth;
+	idpp->depthOffset[1] = maxDepth;
+	idpp->unkE4 = (int)RenderBucket_AllocateOTRange(otMem, pb, minDepth, maxDepth, viewDepth, RenderBucket_SignExtendByte(inst->unk50),
+	                                                (*instFlags & PUSHBUFFER_EXISTS) != 0);
+	idpp->unkE8 = idpp->unkE4;
+
+	if (idpp->unkE4 == 0)
+		return 0;
+
+	if (RenderBucket_ShouldAllocateSecondaryRange(*instFlags) != 0)
+	{
+		// NOTE(aalhendi): PSX-backfeed blocker: retail QueueDraw allocates this
+		// distinct reflected/split OT range at 0x80071320-0x800713b4 with
+		// signed Instance.unk51 as the second depth bias. Native mirrors the
+		// reflective branch explicitly; the split-line scratchpad gate remains
+		// pending.
+		secondaryRange = RenderBucket_AllocateOTRange(otMem, pb, minDepth, maxDepth, viewDepth, RenderBucket_SignExtendByte(inst->unk51), 0);
+		if (secondaryRange == 0)
+			return 0;
+
+		idpp->unkE8 = (int)secondaryRange;
+	}
+
+	return 1;
+}
+
+static struct ModelFrame *RenderBucket_GetFrame(struct Instance *inst, struct ModelHeader *mh, struct ModelFrame **nextFrameOut, int *deltaArrayOut)
 {
 	struct ModelAnim *anim;
 	int frameIndex;
+	int lastFrame;
+	int hasNextFrame;
 	char *firstFrame;
 
-	*animOut = 0;
+	*nextFrameOut = 0;
+	*deltaArrayOut = 0;
 
 	if (mh->ptrFrameData != 0)
+	{
+		*deltaArrayOut = mh->unk3;
 		return mh->ptrFrameData;
+	}
 
 	anim = RenderBucket_GetAnim(inst, mh);
 	if (anim == 0)
@@ -85,24 +600,47 @@ static struct ModelFrame *RenderBucket_GetFrame(struct Instance *inst, struct Mo
 	if (anim->numFrames == 0)
 		return 0;
 
-	frameIndex = inst->animFrame;
-	if (frameIndex < 0)
-		frameIndex = 0;
-	frameIndex %= anim->numFrames;
+	// NOTE(aalhendi): PSX-backfeed blocker: retail frame selection at
+	// 0x80070ca0-0x80070dfc uses stack fields and returns current/next frame
+	// through s6/s1 plus ptrDeltaArray through IDPP 0xd4. Native keeps the same
+	// frame-selection rules as explicit return values until the register ABI is
+	// restored.
+	*deltaArrayOut = (int)anim->ptrDeltaArray;
+	frameIndex = (unsigned short)inst->animFrame;
+	lastFrame = (anim->numFrames & 0x7fff) - 1;
+	hasNextFrame = 0;
+
+	if ((short)anim->numFrames < 0)
+	{
+		lastFrame >>= 1;
+		hasNextFrame = frameIndex & 1;
+		frameIndex >>= 1;
+	}
+
+	if (frameIndex > lastFrame)
+		frameIndex = lastFrame;
 
 	firstFrame = (char *)MODELANIM_GETFRAME(anim);
-	*animOut = anim;
+
+	if (hasNextFrame != 0)
+		*nextFrameOut = (struct ModelFrame *)(firstFrame + (anim->frameSize * (frameIndex + 1)));
+
 	return (struct ModelFrame *)(firstFrame + (anim->frameSize * frameIndex));
 }
 
 static struct RenderBucketEntry *RenderBucket_QueueDraw(struct Instance *inst, struct RenderBucketEntry *rbi, int playerIndex, unsigned int lodMask,
-                                                        int gameMode1)
+                                                        int gameMode1, struct OTMem *otMem)
 {
 	struct ModelHeader *mh;
-	struct ModelAnim *anim;
 	struct ModelFrame *frame;
+	struct ModelFrame *nextFrame;
 	struct InstDrawPerPlayer *idpp;
 	struct Instance *instPlayerBase;
+	struct PushBuffer *pb;
+	unsigned int queuedFlags;
+	int deltaArray;
+	int lodIndex;
+	int viewDepth;
 
 	// NOTE(aalhendi): PSX-backfeed blocker: retail QueueDraw consumes implicit
 	// scratchpad/register state from QueueLev/QueueNonLev. This native helper
@@ -123,30 +661,41 @@ static struct RenderBucketEntry *RenderBucket_QueueDraw(struct Instance *inst, s
 
 	instPlayerBase = (struct Instance *)((char *)inst + (playerIndex * sizeof(struct InstDrawPerPlayer)));
 	idpp = INST_GETIDPP(instPlayerBase);
+	pb = idpp->pushBuffer;
 
-	if (idpp->pushBuffer == 0)
+	if (pb == 0)
 		return rbi;
 
-	mh = &inst->model->headers[0];
-	frame = RenderBucket_GetFrame(inst, mh, &anim);
+	mh = RenderBucket_SelectModelHeader(inst, pb, &lodIndex, &viewDepth);
+	if (mh == 0)
+		return rbi;
+
+	frame = RenderBucket_GetFrame(inst, mh, &nextFrame, &deltaArray);
 	if (frame == 0)
 		return rbi;
 
-	idpp->instFlags = inst->flags | 0x40;
+	queuedFlags = inst->flags;
+	idpp->instFlags = queuedFlags & ~DRAW_SUCCESSFUL;
 	idpp->unkbc = inst->alphaScale;
 	idpp->ptrCurrFrame = frame;
-	idpp->ptrNextFrame = 0;
+	idpp->ptrNextFrame = nextFrame;
 	idpp->ptrCommandList = mh->ptrCommandList;
 	idpp->ptrTexLayout = mh->ptrTexLayout;
 	idpp->ptrColorLayout = (unsigned int)mh->ptrColors;
-	idpp->ptrDeltaArray = (anim != 0) ? (int)anim->ptrDeltaArray : 0;
-	idpp->lodIndex = 0;
+	idpp->ptrDeltaArray = deltaArray;
+	idpp->lodIndex = lodIndex;
 	idpp->mh = mh;
+	RenderBucket_BuildM3x3(inst, mh, viewDepth, idpp);
+	RenderBucket_BuildMvp(inst, mh, pb, &idpp->mvp);
 	idpp->unkE4 = 0;
 	idpp->unkE8 = 0;
 	idpp->unkEC = 0;
 	idpp->unkF0 = 0;
 
+	if (RenderBucket_BuildDepthRange(inst, frame, pb, idpp, otMem, viewDepth, &queuedFlags) == 0)
+		return rbi;
+
+	idpp->instFlags = queuedFlags | DRAW_SUCCESSFUL;
 	rbi->inst = inst;
 	rbi->instPlayerBase = instPlayerBase;
 	return rbi + 1;
@@ -158,9 +707,11 @@ void *RenderBucket_QueueLevInstances(struct CameraDC *cDC, u_long *otMem, void *
 	unsigned int lodMask = (unsigned int)(unsigned char)(unsigned int)lod;
 	int count = (int)(unsigned char)numPlyr;
 
-	// NOTE(aalhendi): PSX-backfeed blocker: native C context replaces the
-	// retail scratchpad register-save frame at 0x1f800000.
-	(void)otMem;
+	// NOTE(aalhendi): PSX-backfeed blocker: native C context replaces the retail
+	// scratchpad register-save frame at 0x1f800000.
+	// TODO(aalhendi): Restore retail table-driven RenderBucket dispatch. Retail
+	// copies 0x8008a428/0x8008a444 to scratchpad 0x1f800094/0x1f8000c4 here;
+	// native direct dispatch must eventually translate those labels to handlers.
 
 	for (int player = count - 1; player >= 0; player--)
 	{
@@ -171,7 +722,7 @@ void *RenderBucket_QueueLevInstances(struct CameraDC *cDC, u_long *otMem, void *
 
 		for (; *visInstSrc != 0; visInstSrc++)
 		{
-			entry = RenderBucket_QueueDraw(*visInstSrc, entry, player, lodMask, gameMode1);
+			entry = RenderBucket_QueueDraw(*visInstSrc, entry, player, lodMask, gameMode1, (struct OTMem *)otMem);
 		}
 	}
 
@@ -184,15 +735,17 @@ void *RenderBucket_QueueNonLevInstances(struct Item *item, u_long *otMem, void *
 	unsigned int lodMask = (unsigned int)(unsigned char)(unsigned int)lod;
 	int count = (int)(unsigned char)numPlyr;
 
-	// NOTE(aalhendi): PSX-backfeed blocker: native C context replaces the
-	// retail scratchpad register-save frame at 0x1f800000.
-	(void)otMem;
+	// NOTE(aalhendi): PSX-backfeed blocker: native C context replaces the retail
+	// scratchpad register-save frame at 0x1f800000.
+	// TODO(aalhendi): Restore retail table-driven RenderBucket dispatch. Retail
+	// copies 0x8008a428/0x8008a444 to scratchpad 0x1f800094/0x1f8000c4 here;
+	// native direct dispatch must eventually translate those labels to handlers.
 
 	for (int player = count - 1; player >= 0; player--)
 	{
 		for (struct Item *curr = item; curr != 0; curr = curr->next)
 		{
-			entry = RenderBucket_QueueDraw((struct Instance *)curr, entry, player, lodMask, gameMode1);
+			entry = RenderBucket_QueueDraw((struct Instance *)curr, entry, player, lodMask, gameMode1, (struct OTMem *)otMem);
 		}
 	}
 
@@ -239,6 +792,27 @@ void RenderBucket_UncompressAnimationFrame(struct RenderBucketDrawContext *ctx, 
 	}
 }
 
+static u_long *RenderBucket_GetNormalOTEntry(struct RenderBucketDrawContext *ctx, int otZ)
+{
+	int depthBin = otZ >> 5;
+
+	if (ctx->idpp->unkE4 == 0)
+		return 0;
+
+	if (depthBin < ctx->idpp->depthOffset[0])
+		return 0;
+
+	if (depthBin > ctx->idpp->depthOffset[1])
+		return 0;
+
+	// NOTE(aalhendi): PSX-backfeed blocker: retail DrawInstPrim_Normal indexes
+	// scratchpad active OT base 0x38 with scratchpad depth 0x2c >> 17 at
+	// 0x8006ad88-0x8006ad98. Native consumes the QueueDraw-produced IDPP
+	// normal range explicitly until the register/scratchpad entry ABI is
+	// restored.
+	return (u_long *)ctx->idpp->unkE4 + depthBin;
+}
+
 int RenderBucket_DrawInstPrim_Normal(struct RenderBucketDrawContext *ctx, u_int command)
 {
 	short posWorld1[4];
@@ -246,6 +820,7 @@ int RenderBucket_DrawInstPrim_Normal(struct RenderBucketDrawContext *ctx, u_int 
 	short posWorld3[4];
 	u_short flags = (command >> 24) & 0xff;
 	u_short texIndex = command & 0x1ff;
+	u_long *otEntry;
 	int boolPassCull;
 	int otZ;
 
@@ -294,11 +869,8 @@ int RenderBucket_DrawInstPrim_Normal(struct RenderBucketDrawContext *ctx, u_int 
 	gte_avsz3();
 	gte_stotz(&otZ);
 
-	if (otZ <= 32)
-		return 0;
-
-	otZ -= 32;
-	if (otZ >= 4080)
+	otEntry = RenderBucket_GetNormalOTEntry(ctx, otZ);
+	if (otEntry == 0)
 		return 0;
 
 	if ((char *)ctx->primMem->curr + sizeof(POLY_GT3) >= (char *)ctx->primMem->endMin100)
@@ -313,7 +885,7 @@ int RenderBucket_DrawInstPrim_Normal(struct RenderBucketDrawContext *ctx, u_int 
 		*(int *)&p->r2 = ctx->tempColor[3];
 		setPolyG3(p);
 		gte_stsxy3(&p->x0, &p->x1, &p->x2);
-		AddPrim((u_long *)ctx->pb->ptrOT + (otZ >> 2), p);
+		AddPrim(otEntry, p);
 		ctx->primMem->curr = p + 1;
 	}
 	else
@@ -337,7 +909,7 @@ int RenderBucket_DrawInstPrim_Normal(struct RenderBucketDrawContext *ctx, u_int 
 		*(short *)&p->u2 = *(short *)&tex->u2;
 		setPolyGT3(p);
 		gte_stsxy3(&p->x0, &p->x1, &p->x2);
-		AddPrim((u_long *)ctx->pb->ptrOT + (otZ >> 2), p);
+		AddPrim(otEntry, p);
 		ctx->primMem->curr = p + 1;
 	}
 
@@ -401,9 +973,6 @@ static int RenderBucket_PrepareDrawContext(struct RenderBucketDrawContext *ctx, 
 	struct ModelHeader *mh;
 	struct ModelFrame *mf;
 	struct ModelAnim *anim;
-	int scale[3];
-	MATRIX mvp;
-	VECTOR pos;
 
 	if (inst == 0)
 		return 0;
@@ -435,35 +1004,10 @@ static int RenderBucket_PrepareDrawContext(struct RenderBucketDrawContext *ctx, 
 
 	anim = RenderBucket_GetAnim(inst, mh);
 
-	scale[0] = (mh->scale[0] * inst->scale[0]) >> 12;
-	scale[1] = (mh->scale[1] * inst->scale[1]) >> 12;
-	scale[2] = (mh->scale[2] * inst->scale[2]) >> 12;
-
-#define RB_MVP(row, col, index) ((pb->matrix_ViewProj.m[row][index] * ((inst->matrix.m[index][col] * scale[col]) >> 8)) >> 0x10)
-
-	mvp.m[0][0] = RB_MVP(0, 0, 0) + RB_MVP(0, 0, 1) + RB_MVP(0, 0, 2);
-	mvp.m[0][1] = RB_MVP(0, 1, 0) + RB_MVP(0, 1, 1) + RB_MVP(0, 1, 2);
-	mvp.m[0][2] = RB_MVP(0, 2, 0) + RB_MVP(0, 2, 1) + RB_MVP(0, 2, 2);
-	mvp.m[1][0] = RB_MVP(1, 0, 0) + RB_MVP(1, 0, 1) + RB_MVP(1, 0, 2);
-	mvp.m[1][1] = RB_MVP(1, 1, 0) + RB_MVP(1, 1, 1) + RB_MVP(1, 1, 2);
-	mvp.m[1][2] = RB_MVP(1, 2, 0) + RB_MVP(1, 2, 1) + RB_MVP(1, 2, 2);
-	mvp.m[2][0] = RB_MVP(2, 0, 0) + RB_MVP(2, 0, 1) + RB_MVP(2, 0, 2);
-	mvp.m[2][1] = RB_MVP(2, 1, 0) + RB_MVP(2, 1, 1) + RB_MVP(2, 1, 2);
-	mvp.m[2][2] = RB_MVP(2, 2, 0) + RB_MVP(2, 2, 1) + RB_MVP(2, 2, 2);
-
-#undef RB_MVP
-
-	pos.vx = inst->matrix.t[0] - pb->matrix_Camera.t[0];
-	pos.vy = inst->matrix.t[1] - pb->matrix_Camera.t[1];
-	pos.vz = inst->matrix.t[2] - pb->matrix_Camera.t[2];
-
-	ApplyMatrixLV(&pb->matrix_ViewProj, &pos, &mvp.t[0]);
-	gte_SetRotMatrix(&mvp);
-	gte_SetTransMatrix(&mvp);
+	gte_SetRotMatrix(&idpp->mvp);
+	gte_SetTransMatrix(&idpp->mvp);
 	gte_SetGeomOffset(pb->rect.w >> 1, pb->rect.h >> 1);
 	gte_SetGeomScreen(pb->distanceToScreen_PREV);
-
-	idpp->mvp = mvp;
 
 	if ((inst->flags & 0x400) != 0)
 		return 0;

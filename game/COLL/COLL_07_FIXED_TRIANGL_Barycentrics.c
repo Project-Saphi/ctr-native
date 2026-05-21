@@ -144,6 +144,7 @@ static void CollFixed_GteRTIR(void)
 	doCOP2(0x049e012);
 }
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8001ede4-0x8001ef1c
 void COLL_FIXED_TRIANGL_Barycentrics(s16 *out, s16 *v1, s16 *v2, s16 *point)
 {
 	s32 v1x = v1[0];

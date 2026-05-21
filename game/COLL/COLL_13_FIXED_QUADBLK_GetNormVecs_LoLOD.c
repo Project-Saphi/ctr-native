@@ -1,5 +1,6 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8001f67c-0x8001f6f0
 void COLL_FIXED_QUADBLK_GetNormVecs_LoLOD(struct ScratchpadStruct *sps, struct QuadBlock *quad)
 {
 	COLL_FIXED_QUADBLK_SetLoadScratchpadVertsContext(sps, quad);

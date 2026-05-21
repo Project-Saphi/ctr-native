@@ -192,6 +192,7 @@ static void COLL_FIXED_TRIANGL_TestPoint_Body(u8 *sps, u8 *v1, u8 *v2, u8 *v3, s
 	CollFixed_WriteU32(sps, 0x74, CollFixed_ReadU32(sps, 0x58));
 }
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8001ef50-0x8001f2dc
 void COLL_FIXED_TRIANGL_TestPoint(void *sps, void *v1, void *v2, void *v3)
 {
 	u8 *spsBytes = (u8 *)sps;

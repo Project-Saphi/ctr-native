@@ -11,6 +11,7 @@ static void COLL_FIXED_QUADBLK_SetLoadScratchpadVertsContext(struct ScratchpadSt
 	sCollFixedLoadScratchpadVertsQuad = quad;
 }
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8001f7f0-0x8001f928
 void COLL_FIXED_QUADBLK_LoadScratchpadVerts(struct ScratchpadStruct *sps)
 {
 	struct LevVertex *ptrVert = sCollFixedLoadScratchpadVertsVertexArray;

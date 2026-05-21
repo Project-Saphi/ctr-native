@@ -1,7 +1,21 @@
 #include <common.h>
 
+static Vec3 VehPhysForce_OnApplyForces_RotateVector(const MATRIX *m, s16 vx, s16 vy, s16 vz)
+{
+	Vec3 out;
+
+	out.x = ((int)m->m[0][0] * vx + (int)m->m[0][1] * vy + (int)m->m[0][2] * vz) >> 12;
+	out.y = ((int)m->m[1][0] * vx + (int)m->m[1][1] * vy + (int)m->m[1][2] * vz) >> 12;
+	out.z = ((int)m->m[2][0] * vx + (int)m->m[2][1] * vy + (int)m->m[2][2] * vz) >> 12;
+
+	return out;
+}
+
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8005ea60-0x8005ebac
 void DECOMP_VehPhysForce_OnApplyForces(struct Thread *thread, struct Driver *driver)
 {
+	(void)thread;
+
 	const int maxMudSinkYLevel = FP(-1);
 	const int maxSpeed = FP8(100);
 	driver->speed = min(driver->speed, maxSpeed);
@@ -9,13 +23,9 @@ void DECOMP_VehPhysForce_OnApplyForces(struct Thread *thread, struct Driver *dri
 	/* origin of driver model is center-bottom of kart,
 	use orientation matrix, and half-radius {0, 25, 0},
 	to find the "true" center of the 3D model */
-	const SVec3 radius = {.x = 0, .y = 25, .z = 0};
-	MulMatrixVec(&driver->originToCenter, (Matrix *)&driver->matrixFacingDir, &radius);
+	driver->originToCenter = VehPhysForce_OnApplyForces_RotateVector(&driver->matrixFacingDir, 0, 25, 0);
 
-#ifndef REBUILD_PC
-	// DECOMP_VehPhysForce_ConvertSpeedToVec(driver);
-	VehPhysForce_ConvertSpeedToVec(driver, &driver->velocity, 0);
-#endif
+	VehPhysForce_ConvertSpeedToVec(driver, &driver->velocity);
 
 	if ((driver->underDriver) && (driver->underDriver->terrain_type == TERRAIN_MUD))
 	{
@@ -27,9 +37,7 @@ void DECOMP_VehPhysForce_OnApplyForces(struct Thread *thread, struct Driver *dri
 		}
 	}
 
-#ifndef REBUILD_PC
 	VehPhysForce_OnGravity(driver, &driver->velocity);
-#endif
 
 	const SVec3 up = {.x = FP(0), .y = FP(1), .z = FP(0)};
 	driver->normalVecUP = up;
@@ -37,20 +45,7 @@ void DECOMP_VehPhysForce_OnApplyForces(struct Thread *thread, struct Driver *dri
 	driver->unkAA = 0; // driver quadblock flags?
 	driver->currBlockTouching = nullptr;
 
-#ifdef REBUILD_PC
-	driver->accel.y = 1; // move upward
-#endif
-
-	for (int i = 0; i < 3; i++)
-	{
-		driver->velocity.v[i] += driver->accel.v[i];
-
-#ifdef REBUILD_PC
-		// temporary replacement to
-		// COLL (which does velocity) and
-		// VehPhysForce_TranslateMatrix (which does matrix)
-		driver->posCurr.v[i] += driver->velocity.v[i];
-		driver->instSelf->matrix.t[i] = driver->posCurr.v[i] >> 8;
-#endif
-	}
+	driver->velocity.x += driver->accel.x;
+	driver->velocity.z += driver->accel.z;
+	driver->velocity.y += driver->accel.y;
 }

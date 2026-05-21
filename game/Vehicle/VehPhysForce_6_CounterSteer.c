@@ -1,5 +1,17 @@
 #include <common.h>
 
+static SVec3 VehPhysForce_CounterSteer_RotateVector(const MATRIX *m, s16 vx, s16 vy, s16 vz)
+{
+	SVec3 out;
+
+	out.x = (s16)(((int)m->m[0][0] * vx + (int)m->m[0][1] * vy + (int)m->m[0][2] * vz) >> 12);
+	out.y = (s16)(((int)m->m[1][0] * vx + (int)m->m[1][1] * vy + (int)m->m[1][2] * vz) >> 12);
+	out.z = (s16)(((int)m->m[2][0] * vx + (int)m->m[2][1] * vy + (int)m->m[2][2] * vz) >> 12);
+
+	return out;
+}
+
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8005fb4c-0x8005fc8c
 void DECOMP_VehPhysForce_CounterSteer(struct Driver *driver)
 {
 	driver->accel.x = 0;
@@ -13,12 +25,20 @@ void DECOMP_VehPhysForce_CounterSteer(struct Driver *driver)
 		return;
 	}
 
-	int angleLimit = driver->angleMaxCounterSteer;
+	int angleLimit = (u8)driver->angleMaxCounterSteer;
 	int angle = driver->turnAngleCurr - driver->turnAnglePrev;
-	angle = clamp(angle, -angleLimit, angleLimit);
-	int sin = DECOMP_MATH_Sin(angle);
+	if (angle > angleLimit)
+	{
+		angle = angleLimit;
+	}
+	else if (angle < -angleLimit)
+	{
+		angle = -angleLimit;
+	}
 
-	const int counterSteerStrength = FP8(-8);
-	SVec3 vec = {.x = FP_MULT(FP8_MULT(driver->terrainMeta1->counterSteerRatio, counterSteerStrength), sin), .y = 0, .z = 0};
-	RotateVector(&driver->accel, &vec);
+	int sine = DECOMP_MATH_Sin(angle);
+	int counterSteerStrength = (driver->terrainMeta1->counterSteerRatio * -8000) >> 8;
+	SVec3 accel = VehPhysForce_CounterSteer_RotateVector(&driver->matrixMovingDir, (s16)((counterSteerStrength * sine) >> 12), 0, 0);
+
+	driver->accel = accel;
 }

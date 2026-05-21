@@ -95,7 +95,7 @@ s32 COLL_MOVED_TRIANGL_ReorderNormals(void *set1, void *v1, void *v2, void *v3);
 void COLL_MOVED_TRIANGL_TestPoint(struct ScratchpadStruct *sps, struct BspSearchVertex *v1, struct BspSearchVertex *v2, struct BspSearchVertex *v3);
 void COLL_MOVED_QUADBLK_TestTriangles(struct QuadBlock *qb, struct ScratchpadStruct *sps);
 void COLL_MOVED_BSPLEAF_TestQuadblocks(struct BSP *node, struct ScratchpadStruct *sps);
-void FUN_80020334(struct QuadBlock *qb, int triangleID, int param_3);
+void COLL_MOVED_FindScrub(struct QuadBlock *qb, int triangleID, struct ScratchpadStruct *sps);
 void COLL_MOVED_PlayerSearch(struct Thread *t, struct Driver *d);
 u32 COLL_MOVED_ScrubImpact(struct Driver *d, struct Thread *t, int param_3, int param_4, int *param_5);
 

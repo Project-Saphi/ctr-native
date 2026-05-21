@@ -1,5 +1,6 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8001861c-0x80018818
 void DECOMP_CAM_ClearScreen(struct GameTracker *gGT)
 {
 	char numPlyr;
@@ -62,14 +63,6 @@ void DECOMP_CAM_ClearScreen(struct GameTracker *gGT)
 		// and if splitline is below top of screen (so top quad exists)
 		if ((level1->clearColor[0].enable != 0) && (0 < iVar7))
 		{
-#ifdef REBUILD_PC
-			RECT16 r;
-			r.x = x;
-			r.y = y;
-			r.w = w;
-			r.h = iVar7;
-			ClearImage(&r, level1->clearColor[0].rgb[0], level1->clearColor[0].rgb[1], level1->clearColor[0].rgb[2]);
-#else
 			tile->x0 = x;
 			tile->y0 = y;
 			tile->w = w;
@@ -78,25 +71,16 @@ void DECOMP_CAM_ClearScreen(struct GameTracker *gGT)
 			*(int *)&tile->r0 = *(int *)&level1->clearColor[0].rgb[0];
 			tile->code = 0x2;
 
-			*(int *)tile = *(u32 *)endOT | 0x3000000;
-			*(u32 *)endOT = (u32)tile & 0xffffff;
+			tile->tag = *(u32 *)endOT | 0x3000000;
+			*(u32 *)endOT = (u32)((uintptr_t)tile & 0xffffff);
 
 			tile++;
-#endif
 		}
 
 		// if bottom-half clear color exists,
 		// and if splitline is above bottom of screen (so bottom quad exists)
 		if ((level1->clearColor[1].enable != 0) && (iVar7 < h))
 		{
-#ifdef REBUILD_PC
-			RECT16 r;
-			r.x = x;
-			r.y = y + iVar7;
-			r.w = w;
-			r.h = h - iVar7;
-			ClearImage(&r, level1->clearColor[1].rgb[0], level1->clearColor[1].rgb[1], level1->clearColor[1].rgb[2]);
-#else
 			tile->x0 = x;
 			tile->y0 = y + iVar7;
 			tile->w = w;
@@ -105,11 +89,10 @@ void DECOMP_CAM_ClearScreen(struct GameTracker *gGT)
 			*(int *)&tile->r0 = *(int *)&level1->clearColor[1].rgb[0];
 			tile->code = 0x2;
 
-			*(int *)tile = *(u32 *)endOT | 0x3000000;
-			*(u32 *)endOT = (u32)tile & 0xffffff;
+			tile->tag = *(u32 *)endOT | 0x3000000;
+			*(u32 *)endOT = (u32)((uintptr_t)tile & 0xffffff);
 
 			tile++;
-#endif
 		}
 	}
 

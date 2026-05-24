@@ -454,6 +454,7 @@
 
 #include "game/MATH/MATH_1_Cos.c"
 #include "game/MATH/MATH_2_FastSqrt.c"
+#include "game/MATH/MATH_3_HitboxMatrix.c"
 #include "game/MATH/MATH_MatrixRotate.c"
 #include "game/MATH/MATH_6_MatrixMul.c"
 
@@ -730,6 +731,7 @@
 
 #include "game/Vehicle/VehPickupItem_0_MaskBoolGoodGuy.c"
 #include "game/Vehicle/VehPickupItem_1_MaskUseWeapon.c"
+#include "game/Vehicle/VehPickupItem_2_MissileGetTargetDriver.c"
 #include "game/Vehicle/VehPickupItem_3_PotionThrow.c"
 #include "game/Vehicle/VehPickupItem_4_ShootNow.c"
 #include "game/Vehicle/VehPickupItem_5_ShootOnCirclePress.c"

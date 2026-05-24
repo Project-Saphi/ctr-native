@@ -40,7 +40,7 @@ void DECOMP_VehPickupItem_ShootNow(struct Driver *d, int weaponID, int flags)
 		GAMEPAD_ShockForce1(d, 8, 0x7f);
 #endif
 
-#ifndef REBUILD_PS1
+#if !defined(REBUILD_PS1) || defined(CTR_NATIVE)
 		struct Driver *victim = VehPickupItem_MissileGetTargetDriver(d);
 #else
 		struct Driver *victim = 0;

@@ -237,12 +237,16 @@ void DECOMP_MainFrame_RenderFrame(struct GameTracker *gGT, struct GamepadSystem 
 #endif
 	}
 
-#ifndef REBUILD_PS1
+#if defined(CTR_NATIVE) || !defined(REBUILD_PS1)
 	// If in main menu, or in adventure arena,
 	// or in End-Of-Race menu
 	if ((gGT->gameMode1 & (ADVENTURE_ARENA | END_OF_RACE | MAIN_MENU)) != 0)
 	{
+#ifdef CTR_NATIVE
+		DECOMP_RefreshCard_Entry();
+#else
 		RefreshCard_Entry();
+#endif
 	}
 #endif
 

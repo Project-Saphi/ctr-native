@@ -659,7 +659,7 @@ void MATH_MatrixMul(MATRIX *output, MATRIX *input, VECTOR *rotate);
 
 void MEMCARD_SetIcon(int iconID);
 u32 MEMCARD_CRC16(u32 crc, int nextByte);
-void MEMCARD_ChecksumSave(u8 *saveBytes, int len);
+int MEMCARD_ChecksumSave(u8 *saveBytes, int len);
 u32 MEMCARD_ChecksumLoad(u8 *saveBytes, int len);
 char *MEMCARD_StringInit(int slotIndex, char *dstString);
 void MEMCARD_StringSet(char *dstString, int slotIdx, char *srcString);
@@ -667,7 +667,7 @@ void MEMCARD_InitCard();
 void MEMCARD_CloseCard();
 u8 MEMCARD_GetNextSwEvent(void);
 u8 MEMCARD_GetNextHwEvent(void);
-// MEMCARD_WaitForHwEvent()
+u8 MEMCARD_WaitForHwEvent(void);
 void MEMCARD_SkipEvents(void);
 int MEMCARD_NewTask(int slotIdx, char *name, u8 *ptrMemcard, int memcardFileSize, int flags);
 void MEMCARD_CloseFile(void);
@@ -678,7 +678,7 @@ u8 MEMCARD_GetInfo(int slotIdx);
 // MEMCARD_Load()
 // MEMCARD_Save()
 u8 MEMCARD_Format(int slotIdx);
-u8 MEMCARD_IsFile(int slotIdx, char *save_name);
+int MEMCARD_IsFile(int slotIdx, char *save_name);
 char *MEMCARD_FindFirstGhost(int slotIdx, char *srcString);
 char *MEMCARD_FindNextGhost(void);
 u8 MEMCARD_EraseFile(int slotIdx, char *srcString);

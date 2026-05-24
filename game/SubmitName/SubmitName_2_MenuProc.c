@@ -16,7 +16,23 @@ void DECOMP_SubmitName_MenuProc(struct RectMenu *menu)
 	// if name entered for Time Trial
 	if (sdata->data10_bbb[0xd] == 1)
 	{
-#ifndef REBUILD_PS1
+#if defined(CTR_NATIVE)
+		// if hit CANCEL
+		if (selection < 0)
+		{
+			// end of race menu with "Save Ghost" option
+			extern struct RectMenu menu224;
+			sdata->ptrDesiredMenu = &menu224;
+		}
+
+		// if hit SAVE
+		else
+		{
+			// GhostMode
+			DECOMP_SelectProfile_ToggleMode(0x31);
+			sdata->ptrDesiredMenu = &data.menuGhostSelection;
+		}
+#elif !defined(REBUILD_PS1)
 		// if hit CANCEL
 		if (selection < 0)
 		{

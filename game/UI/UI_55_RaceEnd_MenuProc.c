@@ -125,7 +125,10 @@ void DECOMP_UI_RaceEnd_MenuProc(struct RectMenu *menu)
 	{
 		sdata->framesSinceRaceEnded = 0x3f9;
 
-#ifndef REBUILD_PS1
+#if defined(CTR_NATIVE)
+		// Set Load/Save to Ghost mode
+		DECOMP_SelectProfile_ToggleMode(0x31);
+#elif !defined(REBUILD_PS1)
 		// Set Load/Save to Ghost mode
 		SelectProfile_ToggleMode(0x31);
 #endif

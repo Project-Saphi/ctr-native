@@ -1,8 +1,49 @@
 #include <common.h>
 
-u8 MEMCARD_Save(int slotIdx, char *name, char *param_3, u8 *ptrMemcard, int memcardFileSize, u32 param6)
+u8 DECOMP_MEMCARD_Save(int slotIdx, char *name, char *param_3, u8 *ptrMemcard, int memcardFileSize, u32 param6)
 
 {
+#ifdef CTR_NATIVE
+	char path[0x40];
+	char *nameNoDevice;
+	FILE *file;
+	int crcResult;
+	size_t wroteIcon;
+	size_t wroteData;
+
+	(void)slotIdx;
+	(void)param_3;
+	(void)param6;
+
+	nameNoDevice = name;
+	if (strncmp(nameNoDevice, "bu00:", 5) == 0)
+		nameNoDevice += 5;
+
+	sdata->crc16_checkpoint_byteIndex = 0;
+	sdata->crc16_checkpoint_status = 0;
+	do
+	{
+		crcResult = DECOMP_MEMCARD_ChecksumSave(ptrMemcard, memcardFileSize);
+	} while (crcResult == MC_RETURN_PENDING);
+
+	if (crcResult != MC_RETURN_IOE)
+		return MC_RETURN_TIMEOUT;
+
+	snprintf(path, sizeof(path), "%s", nameNoDevice);
+
+	file = fopen(path, "wb");
+	if (file == NULL)
+		return MC_RETURN_FULL;
+
+	wroteIcon = fwrite(&data.memcardIcon_Ghost[0], 1, 0x100, file);
+	wroteData = fwrite(ptrMemcard, 1, memcardFileSize, file);
+	fclose(file);
+
+	if ((wroteIcon != 0x100) || (wroteData != (size_t)memcardFileSize))
+		return MC_RETURN_TIMEOUT;
+
+	return MC_RETURN_IOE;
+#else
 	if (sdata->memcard_stage != MC_STAGE_IDLE)
 		return MC_RETURN_TIMEOUT;
 
@@ -49,4 +90,5 @@ u8 MEMCARD_Save(int slotIdx, char *name, char *param_3, u8 *ptrMemcard, int memc
 		sdata->memcard_stage = MC_STAGE_SAVE_PART0_START;
 		return MC_RETURN_PENDING;
 	}
+#endif
 }

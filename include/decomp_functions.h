@@ -347,6 +347,40 @@ void MATH_MatrixMul(MATRIX *output, MATRIX *input, VECTOR *rotate);
 void DECOMP_MATH_MatrixMul(MATRIX *output, MATRIX *input, VECTOR *rotate);
 
 void DECOMP_MEMCARD_InitCard(void);
+void DECOMP_MEMCARD_SetIcon(int iconID);
+u32 DECOMP_MEMCARD_CRC16(u32 crc, int nextByte);
+int DECOMP_MEMCARD_ChecksumSave(u8 *saveBytes, int len);
+int DECOMP_MEMCARD_ChecksumLoad(u8 *saveBytes, int len);
+char *DECOMP_MEMCARD_StringInit(int slotIndex, char *dstString);
+void DECOMP_MEMCARD_StringSet(char *dstString, int slotIdx, char *srcString);
+void DECOMP_MEMCARD_CloseCard(void);
+u8 DECOMP_MEMCARD_GetNextSwEvent(void);
+u8 DECOMP_MEMCARD_GetNextHwEvent(void);
+void DECOMP_MEMCARD_SkipEvents(void);
+int DECOMP_MEMCARD_NewTask(int slotIdx, char *name, u8 *ptrMemcard, int memcardFileSize, int flags);
+void DECOMP_MEMCARD_CloseFile(void);
+int DECOMP_MEMCARD_ReadFile(int start_offset, int size);
+u8 DECOMP_MEMCARD_WriteFile(int start_offset, const u8 *data, int size);
+void DECOMP_MEMCARD_GetFreeBytes(int slotIdx);
+u8 DECOMP_MEMCARD_GetInfo(int slotIdx);
+u8 DECOMP_MEMCARD_Format(int slotIdx);
+int DECOMP_MEMCARD_IsFile(int slotIdx, char *save_name);
+char *DECOMP_MEMCARD_FindFirstGhost(int slotIdx, char *srcString);
+char *DECOMP_MEMCARD_FindNextGhost(void);
+u8 DECOMP_MEMCARD_EraseFile(int slotIdx, char *srcString);
+int DECOMP_MEMCARD_HandleEvent(void);
+u8 DECOMP_MEMCARD_Save(int slotIdx, char *name, char *icon, u8 *ptrMemcard, int memcardFileSize, u32 flags);
+
+void DECOMP_RefreshCard_Entry(void);
+void DECOMP_RefreshCard_GhostEncodeProfile(u32 slotIndex, u16 characterID, u16 levelID, int time, char *name);
+u32 DECOMP_RefreshCard_GhostEncodeByte(int currByte);
+void DECOMP_RefreshCard_StartMemcardAction(int action);
+
+void DECOMP_SelectProfile_MuteCursors(void);
+void DECOMP_SelectProfile_UnMuteCursors(void);
+u32 DECOMP_SelectProfile_InputLogic(struct RectMenu *menu, s16 numRows, u32 confirmFlags);
+void DECOMP_SelectProfile_AllProfiles_MenuProc(struct RectMenu *menu);
+void DECOMP_SelectProfile_ToggleMode(u32 mode);
 
 void DECOMP_MEMPACK_Init(int ramSize);
 void DECOMP_MEMPACK_SwapPacks(int index);

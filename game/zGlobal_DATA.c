@@ -5029,7 +5029,11 @@ struct Data
                 {
                     .stringIndexTitle = -1,
                     .state = 0x2820,
+#ifdef CTR_NATIVE
+                    .funcPtr = DECOMP_SelectProfile_AllProfiles_MenuProc,
+#else
                     .funcPtr = (void (*)(struct RectMenu *))0x800490c4,
+#endif
                 },
 
             .menuWarning2 =

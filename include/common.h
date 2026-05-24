@@ -25,6 +25,7 @@
 #include "PCDRV/pcdrv.h"
 #endif
 
+#include <psn00bsdk/include/sys/fcntl.h>
 
 // =============================
 

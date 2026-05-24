@@ -1,0 +1,43 @@
+#include <common.h>
+
+static s16 *SelectProfile_Mode(void)
+{
+	return (s16 *)&sdata->data10_bbb[0];
+}
+
+static s16 *SelectProfile_TimerSaveComplete(void)
+{
+	return (s16 *)&sdata->data10_bbb[12];
+}
+
+// NOTE(aalhendi): Retail-mapped NTSC-U 926 0x80048e2c-0x80048edc.
+// TODO(aalhendi): Port SelectProfile_Init before this receives an ASM-verified stamp.
+void DECOMP_SelectProfile_ToggleMode(u32 mode)
+{
+	sdata->memcardAction = mode & 0xf;
+
+	// 0x00 AdvNew, 0x10 AdvLoad, 0x20 green load/save, 0x30 ghost, 0x40 slot selected.
+	*SelectProfile_Mode() = mode & 0xf0;
+	*(s16 *)&sdata->data10_bbb[2] = 0;
+	*(s16 *)&sdata->data10_bbb[4] = 0;
+	*(s16 *)&sdata->data10_bbb[6] = 0;
+	*(s16 *)&sdata->data10_bbb[8] = 0;
+	*(s16 *)&sdata->data10_bbb[10] = 0;
+	*SelectProfile_TimerSaveComplete() = 0;
+
+	DECOMP_SelectProfile_UnMuteCursors();
+
+	data.menuFourAdvProfiles.drawStyle &= ~0x10;
+	data.menuOverwriteAdv.drawStyle &= ~0x10;
+	if (*SelectProfile_Mode() == 0x20)
+	{
+		data.menuFourAdvProfiles.drawStyle |= 0x10;
+		data.menuOverwriteAdv.drawStyle |= 0x10;
+	}
+
+	// TODO(aalhendi): SelectProfile_Init owns the adventure load/save 3D icons.
+	// Native ghost save does not need it, but the adventure profile path does.
+
+	data.menuFourAdvProfiles.rowSelected = sdata->unk_8008d73C_relatedToRowHighlighted;
+	*(s16 *)&sdata->data10_bbb[2] = 0;
+}

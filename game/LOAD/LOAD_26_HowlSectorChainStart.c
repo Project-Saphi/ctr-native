@@ -1,5 +1,6 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x80032594-0x8003266c
 int DECOMP_LOAD_HowlSectorChainStart(CdlFILE *cdlFileHWL, void *ptrDestination, int firstSector, int numSector)
 {
 	CdlLOC loc;
@@ -15,14 +16,10 @@ int DECOMP_LOAD_HowlSectorChainStart(CdlFILE *cdlFileHWL, void *ptrDestination, 
 
 	DECOMP_CDSYS_SetMode_StreamData();
 
-// This will never fail. HowlSectorChainStart will load 1 sector
-// for songHeader (or sfx bankHeader), then that says how big the
-// rest of the data is, then load more sectors to complete the data
-#if 0
 	// Return error, if reading out-of-bounds after the end of KART HWL
 	int sizeOver = ((firstSector + numSector) * 0x800 - cdlFileHWL->size);
-	if (sizeOver >= 0x800 ) return 0;
-#endif
+	if (sizeOver >= 0x800)
+		return 0;
 
 	CdIntToPos(CdPosToInt(&cdlFileHWL->pos) + firstSector, &loc);
 

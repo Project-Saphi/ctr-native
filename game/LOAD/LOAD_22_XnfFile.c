@@ -1,6 +1,7 @@
 #include <common.h>
 
 // Used for XNF and only the XNF
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x80032344-0x80032438
 void *DECOMP_LOAD_XnfFile(char *filename, void *ptrDestination, int *size)
 {
 	CdlFILE cdlFile;
@@ -19,6 +20,9 @@ void *DECOMP_LOAD_XnfFile(char *filename, void *ptrDestination, int *size)
 		// remove alignment before next Read
 		int sectorSize = (cdlFile.size + 0x7ffU) & 0xfffff800;
 		ptrDestination = DECOMP_MEMPACK_AllocMem(sectorSize /*, fileName*/);
+		if (ptrDestination == NULL)
+			return NULL;
+
 		DECOMP_MEMPACK_ReallocMem(cdlFile.size);
 	}
 

@@ -1,5 +1,6 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x80067b7c-0x80067f4c.
 void DECOMP_VehStuckProc_RevEngine_Animate(struct Thread *t, struct Driver *d)
 {
 	char bVar1;

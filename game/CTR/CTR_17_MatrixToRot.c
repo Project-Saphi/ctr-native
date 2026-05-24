@@ -24,8 +24,13 @@ void CTR_MatrixToRot(SVECTOR *rot, MATRIX *matrix, u32 flags)
 
 	// 8008D004
 	// char unk_CTR_MatrixToRot_table[0x10];
+#if defined(REBUILD_PC)
+	char *table1 = &sdata->unk_CTR_MatrixToRot_table[0];
+	char *table2 = &sdata->unk_CTR_MatrixToRot_table[8];
+#else
 	char *table1 = (char *)0x8008d004;
 	char *table2 = (char *)0x8008d00C;
+#endif
 
 	// take value from the first table
 	u32 t1value = (u32)table1[flags >> 3 & 3];

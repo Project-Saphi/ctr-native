@@ -149,7 +149,7 @@ void DECOMP_VehPickupItem_ShootNow(struct Driver *d, int weaponID, int flags)
 			talk = 10;
 			d->instBombThrow = weaponInst;
 
-#ifndef REBUILD_PS1
+#if !defined(REBUILD_PS1) || defined(CTR_NATIVE)
 
 			// Original Code
 			s16 rot[3];

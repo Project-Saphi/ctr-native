@@ -176,6 +176,7 @@
 #include "game/CTR/CTR_08_ClearRenderLists_1P2P.c"
 #include "game/CTR/CTR_09_ClearRenderLists_3P4P.c"
 #include "game/CTR/CTR_11_ErrorScreen.c"
+#include "game/CTR/CTR_17_MatrixToRot.c"
 
 #include "game/DebugFont/DebugFont_0_Init.c"
 #include "game/DebugFont/DebugFont_1_DrawNumbers.c"
@@ -452,6 +453,7 @@
 #include "game/MAIN/MainRaceTrack_01_RequestLoad.c"
 
 #include "game/MATH/MATH_1_Cos.c"
+#include "game/MATH/MATH_2_FastSqrt.c"
 #include "game/MATH/MATH_MatrixRotate.c"
 #include "game/MATH/MATH_6_MatrixMul.c"
 

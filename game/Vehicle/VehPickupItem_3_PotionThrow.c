@@ -1,5 +1,6 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800652c8-0x8006540c.
 u32 DECOMP_VehPickupItem_PotionThrow(struct MineWeapon *mine, struct Instance *inst, u32 flags)
 {
 	s32 throwVelocity;

@@ -534,7 +534,7 @@ void DECOMP_VehPickupItem_ShootNow(struct Driver *d, int weaponID, int flags)
 
 		struct Driver **dptr;
 
-		for (dptr = &gGT->drivers[0]; dptr < &gGT->drivers[7]; dptr++)
+		for (dptr = &gGT->drivers[0]; dptr < &gGT->drivers[8]; dptr++)
 		{
 			struct Driver *victim = *dptr;
 

@@ -4,9 +4,13 @@ void Seal_CheckColl(struct Instance *sealInst, struct Thread *sealTh, int damage
 
 // NOTE(aalhendi): ASM-verified NTSC-U 926 0x800b5f50-0x800b64c0.
 
-int DECOMP_RB_Fireball_ThCollide(struct Thread *thread)
+int DECOMP_RB_Fireball_ThCollide(struct Thread *fireballThread, struct Thread *driverTh, void *funcThCollide, struct ScratchpadStruct *sps)
 {
-	return thread->modelIndex == DYNAMIC_PLAYER;
+	(void)fireballThread;
+	(void)driverTh;
+	(void)funcThCollide;
+
+	return (s16)sps->Input1.modelID == DYNAMIC_PLAYER;
 }
 
 struct ParticleEmitter emSet_Fireball[10] = {[0] =

@@ -81,9 +81,13 @@ void Seal_CheckColl(struct Instance *sealInst, struct Thread *sealTh, int damage
 	}
 }
 
-int DECOMP_RB_Seal_ThCollide(struct Thread *thread)
+int DECOMP_RB_Seal_ThCollide(struct Thread *sealThread, struct Thread *driverTh, void *funcThCollide, struct ScratchpadStruct *sps)
 {
-	return thread->modelIndex == DYNAMIC_PLAYER;
+	(void)sealThread;
+	(void)driverTh;
+	(void)funcThCollide;
+
+	return (s16)sps->Input1.modelID == DYNAMIC_PLAYER;
 }
 
 void DECOMP_RB_Seal_ThTick_TurnAround(struct Thread *t)

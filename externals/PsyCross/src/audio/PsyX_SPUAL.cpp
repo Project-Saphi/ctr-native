@@ -7,6 +7,8 @@
 
 #include <string.h>
 #include <assert.h>
+#include <stdio.h>
+#include <vector>
 #include <AL/al.h>
 #include <AL/alc.h>
 #include <AL/alext.h>
@@ -91,6 +93,8 @@ int			g_currEffectSlotIdx = 0;
 ALuint		g_nAlReverbEffect = 0;
 int			g_enableSPUReverb = 0;
 int			g_ALEffectsSupported = 0;
+static ALuint g_XaSource = 0;
+static ALuint g_XaBuffer = 0;
 
 LPALGENEFFECTS alGenEffects = NULL;
 LPALDELETEEFFECTS alDeleteEffects = NULL;
@@ -99,6 +103,303 @@ LPALEFFECTF alEffectf = NULL;
 LPALGENAUXILIARYEFFECTSLOTS alGenAuxiliaryEffectSlots = NULL;
 LPALDELETEAUXILIARYEFFECTSLOTS alDeleteAuxiliaryEffectSlots = NULL;
 LPALAUXILIARYEFFECTSLOTI alAuxiliaryEffectSloti = NULL;
+
+static const int XA_NUM_TYPES = 3;
+static const int XA_HEADER_SIZE = 0x44;
+static const int XA_NUM_XAS_TOTAL_OFFSET = 0x0c;
+static const int XA_NUM_TRACKS_TOTAL_OFFSET = 0x10;
+static const int XA_NUM_SONGS_OFFSET = 0x2c;
+static const int XA_FIRST_SONG_INDEX_OFFSET = 0x38;
+static const int XA_SIZE_ENTRY_BYTES = 4;
+static const int XA_FORM2_SECTOR_SIZE = 2336;
+static const int XA_FULL_SECTOR_SIZE = 2352;
+static const int XA_FRAMES_PER_SECTOR = 18;
+static const int XA_FRAME_SIZE = 128;
+static const int XA_SUBHEADER_SIZE = 8;
+static const int XA_SAMPLES_PER_SOUND_UNIT = 28;
+static const int XA_BLOCKS_PER_FRAME = 4;
+static const int XA_SUBFRAMES_PER_FRAME = 8;
+static const int XA_SAMPLE_RATE_37800 = 37800;
+static const int XA_SAMPLE_RATE_18900 = 18900;
+static const int XA_POS_TABLE[5] = {0, 60, 115, 98, 122};
+static const int XA_NEG_TABLE[5] = {0, 0, -52, -55, -60};
+
+struct XaTrackInfo
+{
+	int fileNumber;
+	int channelFilter;
+	int numSectors;
+};
+
+struct XaDecodeState
+{
+	int old[2];
+	int older[2];
+};
+
+static unsigned int ReadLE32(const unsigned char *bytes)
+{
+	return (unsigned int)bytes[0] | ((unsigned int)bytes[1] << 8) | ((unsigned int)bytes[2] << 16) | ((unsigned int)bytes[3] << 24);
+}
+
+static int ReadLE16Signed(const unsigned char *bytes)
+{
+	return (short)((unsigned short)bytes[0] | ((unsigned short)bytes[1] << 8));
+}
+
+static int ReadFileBytes(const char *path, std::vector<unsigned char> &bytes)
+{
+	FILE *fp = fopen(path, "rb");
+	if (!fp)
+		return 0;
+
+	if (fseek(fp, 0, SEEK_END) != 0)
+	{
+		fclose(fp);
+		return 0;
+	}
+
+	long size = ftell(fp);
+	if (size <= 0)
+	{
+		fclose(fp);
+		return 0;
+	}
+
+	if (fseek(fp, 0, SEEK_SET) != 0)
+	{
+		fclose(fp);
+		return 0;
+	}
+
+	bytes.resize((size_t)size);
+	size_t read = fread(bytes.data(), 1, bytes.size(), fp);
+	fclose(fp);
+	return read == bytes.size();
+}
+
+static int BuildXAPath(char *path, size_t pathSize, int categoryID, int fileNumber)
+{
+	const char *dir = NULL;
+
+	if (categoryID == 0)
+		dir = "assets/XA/MUSIC";
+	else if (categoryID == 1)
+		dir = "assets/XA/ENG/EXTRA";
+	else if (categoryID == 2)
+		dir = "assets/XA/ENG/GAME";
+	else
+		return 0;
+
+	return snprintf(path, pathSize, "%s/S%02d.XA", dir, fileNumber) > 0;
+}
+
+static int LookupXATrackInfo(int categoryID, int xaID, XaTrackInfo *info)
+{
+	std::vector<unsigned char> xnf;
+
+	if ((categoryID < 0) || (categoryID >= XA_NUM_TYPES) || (xaID < 0))
+		return 0;
+
+	if (!ReadFileBytes("assets/XA/ENG.XNF", xnf))
+		return 0;
+
+	if ((int)xnf.size() < XA_HEADER_SIZE)
+		return 0;
+
+	if (ReadLE32(&xnf[0]) != 0x464e4958)
+		return 0;
+
+	if (ReadLE32(&xnf[4]) != 102)
+		return 0;
+
+	if (ReadLE32(&xnf[8]) != XA_NUM_TYPES)
+		return 0;
+
+	int numXasTotal = (int)ReadLE32(&xnf[XA_NUM_XAS_TOTAL_OFFSET]);
+	int numTracksTotal = (int)ReadLE32(&xnf[XA_NUM_TRACKS_TOTAL_OFFSET]);
+	int xaSizeOffset = XA_HEADER_SIZE + numXasTotal * 4;
+	int xaSizeEnd = xaSizeOffset + numTracksTotal * XA_SIZE_ENTRY_BYTES;
+
+	if ((numXasTotal < 0) || (numTracksTotal < 0) || (xaSizeEnd < xaSizeOffset) || (xaSizeEnd > (int)xnf.size()))
+		return 0;
+
+	int numSongs = (int)ReadLE32(&xnf[XA_NUM_SONGS_OFFSET + categoryID * 4]);
+	int firstSongIndex = (int)ReadLE32(&xnf[XA_FIRST_SONG_INDEX_OFFSET + categoryID * 4]);
+
+	if (xaID >= numSongs)
+		return 0;
+
+	int entryIndex = firstSongIndex + xaID;
+	if ((entryIndex < 0) || (entryIndex >= numTracksTotal))
+		return 0;
+
+	const unsigned char *entry = &xnf[xaSizeOffset + entryIndex * XA_SIZE_ENTRY_BYTES];
+	info->channelFilter = entry[0];
+	info->fileNumber = entry[1];
+	info->numSectors = ReadLE16Signed(entry + 2);
+
+	return info->numSectors > 0;
+}
+
+static int Clamp16(int value)
+{
+	if (value > 32767)
+		return 32767;
+	if (value < -32768)
+		return -32768;
+	return value;
+}
+
+static void DecodeXA28Nibbles(const unsigned char *sector, int frameOff, int block, int nibble, int channel, XaDecodeState *state, std::vector<short> &out)
+{
+	int param = sector[frameOff + 4 + block * 2 + nibble];
+	int shift = param & 0xf;
+	int weight = (param >> 4) & 0xf;
+
+	if (weight > 4)
+		weight = 4;
+
+	int w0 = XA_POS_TABLE[weight];
+	int w1 = XA_NEG_TABLE[weight];
+
+	for (int i = 0; i < XA_SAMPLES_PER_SOUND_UNIT; i++)
+	{
+		unsigned char byte = sector[frameOff + 16 + i * 4 + block];
+		unsigned char nib = (nibble == 0) ? (unsigned char)((byte & 0xf) << 4) : (unsigned char)(byte & 0xf0);
+		int sample = ((signed char)nib) << 8;
+
+		sample >>= shift;
+		sample += (state->old[channel] * w0) >> 6;
+		sample += (state->older[channel] * w1) >> 6;
+		sample = Clamp16(sample);
+
+		state->older[channel] = state->old[channel];
+		state->old[channel] = sample;
+		out.push_back((short)sample);
+	}
+}
+
+static void DecodeXASectorMono(const unsigned char *sector, int sectorBase, XaDecodeState *state, std::vector<short> &out)
+{
+	for (int frame = 0; frame < XA_FRAMES_PER_SECTOR; frame++)
+	{
+		int frameOff = sectorBase + XA_SUBHEADER_SIZE + frame * XA_FRAME_SIZE;
+		const unsigned char *header = &sector[frameOff + 4];
+
+		for (int su = 0; su < XA_SUBFRAMES_PER_FRAME; su++)
+		{
+			int paramIndex = (su & 3) | ((su & 4) << 1);
+			int param = header[paramIndex];
+			int shift = param & 0xf;
+			int weight = (param >> 4) & 0xf;
+
+			if (weight > 4)
+				weight = 4;
+
+			int w0 = XA_POS_TABLE[weight];
+			int w1 = XA_NEG_TABLE[weight];
+
+			for (int i = 0; i < XA_SAMPLES_PER_SOUND_UNIT; i++)
+			{
+				unsigned char byte = sector[frameOff + 16 + i * 4 + (su >> 1)];
+				unsigned char nib = ((su & 1) == 0) ? (unsigned char)((byte & 0xf) << 4) : (unsigned char)(byte & 0xf0);
+				int sample = ((signed char)nib) << 8;
+
+				sample >>= shift;
+				sample += (state->old[0] * w0) >> 6;
+				sample += (state->older[0] * w1) >> 6;
+				sample = Clamp16(sample);
+
+				state->older[0] = state->old[0];
+				state->old[0] = sample;
+				out.push_back((short)sample);
+			}
+		}
+	}
+}
+
+static void DecodeXASectorStereo(const unsigned char *sector, int sectorBase, XaDecodeState *state, std::vector<short> &out)
+{
+	for (int frame = 0; frame < XA_FRAMES_PER_SECTOR; frame++)
+	{
+		int frameOff = sectorBase + XA_SUBHEADER_SIZE + frame * XA_FRAME_SIZE;
+
+		for (int block = 0; block < XA_BLOCKS_PER_FRAME; block++)
+		{
+			short left[XA_SAMPLES_PER_SOUND_UNIT];
+			short right[XA_SAMPLES_PER_SOUND_UNIT];
+			std::vector<short> tmp;
+
+			tmp.reserve(XA_SAMPLES_PER_SOUND_UNIT);
+			DecodeXA28Nibbles(sector, frameOff, block, 0, 0, state, tmp);
+			for (int i = 0; i < XA_SAMPLES_PER_SOUND_UNIT; i++)
+				left[i] = tmp[i];
+
+			tmp.clear();
+			DecodeXA28Nibbles(sector, frameOff, block, 1, 1, state, tmp);
+			for (int i = 0; i < XA_SAMPLES_PER_SOUND_UNIT; i++)
+				right[i] = tmp[i];
+
+			for (int i = 0; i < XA_SAMPLES_PER_SOUND_UNIT; i++)
+			{
+				out.push_back(left[i]);
+				out.push_back(right[i]);
+			}
+		}
+	}
+}
+
+static int DecodeXAFile(const unsigned char *bytes, int byteCount, int channelFilter, int maxSectors, std::vector<short> &pcm, int *sampleRate,
+                        int *numChannels)
+{
+	int sectorSize;
+
+	if ((byteCount % XA_FULL_SECTOR_SIZE) == 0)
+		sectorSize = XA_FULL_SECTOR_SIZE;
+	else if ((byteCount % XA_FORM2_SECTOR_SIZE) == 0)
+		sectorSize = XA_FORM2_SECTOR_SIZE;
+	else
+		return 0;
+
+	int sectorBase = (sectorSize == XA_FULL_SECTOR_SIZE) ? 16 : 0;
+	int totalSectors = byteCount / sectorSize;
+	int sectorsToScan = maxSectors < totalSectors ? maxSectors : totalSectors;
+	XaDecodeState state = {};
+
+	*sampleRate = XA_SAMPLE_RATE_37800;
+	*numChannels = 1;
+
+	for (int sector = 0; sector < sectorsToScan; sector++)
+	{
+		const unsigned char *src = &bytes[sector * sectorSize];
+		const unsigned char *header = &src[sectorBase];
+		int subMode = header[2];
+		int coding = header[3];
+		int isStereo = (coding & 0x03) != 0;
+		int srBits = (coding >> 2) & 0x03;
+		int bpsBits = (coding >> 4) & 0x03;
+
+		if ((subMode & 0x04) == 0)
+			continue;
+
+		if ((header[0] != 1) || (header[1] != channelFilter))
+			continue;
+
+		if (bpsBits != 0)
+			continue;
+
+		*sampleRate = (srBits == 0) ? XA_SAMPLE_RATE_37800 : XA_SAMPLE_RATE_18900;
+		*numChannels = isStereo ? 2 : 1;
+
+		if (isStereo)
+			DecodeXASectorStereo(src, sectorBase, &state, pcm);
+		else
+			DecodeXASectorMono(src, sectorBase, &state, pcm);
+	}
+
+	return !pcm.empty();
+}
 
 static void InitOpenAlEffects()
 {
@@ -255,6 +556,13 @@ void PsyX_SPUAL_ShutdownSound()
 	if (!g_ALCcontext)
 		return;
 
+	PsyX_SPUAL_StopXA();
+	if (g_XaSource != 0)
+	{
+		alDeleteSources(1, &g_XaSource);
+		g_XaSource = 0;
+	}
+
 	for (int i = 0; i < s_spuVoiceCount; i++)
 	{
 		SPUALVoice* voice = &g_SpuVoices[i];
@@ -275,6 +583,95 @@ void PsyX_SPUAL_ShutdownSound()
 	g_ALCcontext = NULL;
 	g_ALCdevice = NULL;
 #endif // __EMSCRIPTEN__
+}
+
+int PsyX_SPUAL_GetXATrackLength(int categoryID, int xaID)
+{
+	XaTrackInfo info;
+
+	if (!LookupXATrackInfo(categoryID, xaID, &info))
+		return 0;
+
+	return info.numSectors;
+}
+
+void PsyX_SPUAL_StopXA(void)
+{
+	if (g_XaSource != 0)
+	{
+		alSourceStop(g_XaSource);
+		alSourcei(g_XaSource, AL_BUFFER, 0);
+	}
+
+	if (g_XaBuffer != 0)
+	{
+		alDeleteBuffers(1, &g_XaBuffer);
+		g_XaBuffer = 0;
+	}
+}
+
+int PsyX_SPUAL_IsXAPlaying(void)
+{
+	ALint state = 0;
+
+	if (g_XaSource == 0)
+		return 0;
+
+	alGetSourcei(g_XaSource, AL_SOURCE_STATE, &state);
+	return state == AL_PLAYING;
+}
+
+int PsyX_SPUAL_PlayXATrack(int categoryID, int xaID, int volumeLeft, int volumeRight)
+{
+	XaTrackInfo info;
+	char path[128];
+	std::vector<unsigned char> data;
+	std::vector<short> pcm;
+	int sampleRate;
+	int numChannels;
+
+	if (!g_ALCdevice && !PsyX_SPUAL_InitSound())
+		return 0;
+
+	if (!LookupXATrackInfo(categoryID, xaID, &info))
+		return 0;
+
+	if (!BuildXAPath(path, sizeof(path), categoryID, info.fileNumber))
+		return 0;
+
+	if (!ReadFileBytes(path, data))
+		return 0;
+
+	if (!DecodeXAFile(data.data(), (int)data.size(), info.channelFilter, info.numSectors, pcm, &sampleRate, &numChannels))
+		return 0;
+
+	SDL_LockMutex(g_SpuMutex);
+
+	if (g_XaSource == 0)
+		alGenSources(1, &g_XaSource);
+
+	PsyX_SPUAL_StopXA();
+	alGenBuffers(1, &g_XaBuffer);
+
+	ALenum format = (numChannels == 2) ? AL_FORMAT_STEREO16 : AL_FORMAT_MONO16;
+	alBufferData(g_XaBuffer, format, pcm.data(), (ALsizei)(pcm.size() * sizeof(short)), sampleRate);
+	alSourcei(g_XaSource, AL_BUFFER, g_XaBuffer);
+	alSourcei(g_XaSource, AL_SOURCE_RELATIVE, AL_TRUE);
+
+	int volume = (volumeLeft + volumeRight) / 2;
+	float gain = (float)volume / 16384.0f;
+	if (gain < 0.0f)
+		gain = 0.0f;
+	if (gain > 1.0f)
+		gain = 1.0f;
+
+	alSourcef(g_XaSource, AL_GAIN, gain);
+	alSourcef(g_XaSource, AL_PITCH, 1.0f);
+	alSourcePlay(g_XaSource);
+
+	SDL_UnlockMutex(g_SpuMutex);
+
+	return 1;
 }
 
 //--------------------------------------------------------------------------------

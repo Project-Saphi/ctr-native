@@ -1,10 +1,19 @@
 #include <common.h>
 
+#if defined(REBUILD_PC) && defined(CTR_NATIVE)
+int PsyX_SPUAL_GetXATrackLength(int categoryID, int xaID);
+#endif
+
 // NOTE(aalhendi): ASM-verified NTSC-U 926 0x8001cd20-0x8001cdb4
 int DECOMP_CDSYS_XAGetTrackLength(int categoryID, int xaID)
 {
 	if (sdata->boolUseDisc == 0)
+	{
+#if defined(REBUILD_PC) && defined(CTR_NATIVE)
+		return PsyX_SPUAL_GetXATrackLength(categoryID, xaID);
+#endif
 		return 0;
+	}
 
 	if (sdata->bool_XnfLoaded == 0)
 		return 0;

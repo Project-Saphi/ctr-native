@@ -35,6 +35,11 @@ extern int PsyX_SPUAL_GetReverbState();
 extern u_int PsyX_SPUAL_SetReverbVoice(int on_off, u_int voice_bit);
 extern u_int PsyX_SPUAL_GetReverbVoice();
 
+extern int PsyX_SPUAL_PlayXATrack(int categoryID, int xaID, int volumeLeft, int volumeRight);
+extern int PsyX_SPUAL_GetXATrackLength(int categoryID, int xaID);
+extern int PsyX_SPUAL_IsXAPlaying(void);
+extern void PsyX_SPUAL_StopXA(void);
+
 #if defined(_LANGUAGE_C_PLUS_PLUS)||defined(__cplusplus)||defined(c_plusplus)
 }
 #endif

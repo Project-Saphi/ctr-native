@@ -1,5 +1,9 @@
 #include <common.h>
 
+#if defined(REBUILD_PC) && defined(CTR_NATIVE)
+int PsyX_SPUAL_PlayXATrack(int categoryID, int xaID, int volumeLeft, int volumeRight);
+#endif
+
 // NOTE(aalhendi): ASM-verified NTSC-U 926 0x8001cdb4-0x8001cf98
 int DECOMP_CDSYS_XAPlay(int categoryID, int xaID)
 {
@@ -7,7 +11,23 @@ int DECOMP_CDSYS_XAPlay(int categoryID, int xaID)
 	char buf2[8];
 
 	if (sdata->boolUseDisc == 0)
+	{
+#if defined(REBUILD_PC) && defined(CTR_NATIVE)
+		int nativeVol = (categoryID == CDSYS_XA_TYPE_MUSIC) ? sdata->vol_Music : sdata->vol_Voice;
+
+		// NOTE(aalhendi): Native PCDRV has no CD-XA IRQ stream. Feed extracted
+		// XA assets to OpenAL and synthesize the minimal retail XA state gates.
+		if (PsyX_SPUAL_PlayXATrack(categoryID, xaID, nativeVol << 7, nativeVol << 7) == 0)
+			return 0;
+
+		sdata->XA_State = 3;
+		sdata->XA_Playing_Index = xaID;
+		sdata->XA_Playing_Category = categoryID;
+		sdata->XA_CurrOffset = 0;
 		return 1;
+#endif
+		return 1;
+	}
 
 	if (sdata->bool_XnfLoaded == 0)
 		return 0;

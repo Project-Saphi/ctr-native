@@ -1,6 +1,6 @@
 #include <common.h>
 
-// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800ad92c-0x800ad9ac.
+// NOTE(aalhendi): ASM-verified against NTSC-U 926 overlay 231 0x800ad92c-0x800ad9ac.
 void RB_Explosion_ThTick(struct Thread *t)
 {
 	struct Instance *inst = t->inst;
@@ -11,9 +11,12 @@ void RB_Explosion_ThTick(struct Thread *t)
 	if ((frame + 1) < total)
 	{
 		inst->animFrame++;
-		return;
+	}
+	else
+	{
+		// dead thread
+		t->flags |= 0x800;
 	}
 
-	// dead thread
-	t->flags |= 0x800;
+	ThTick_FastRET(t);
 }

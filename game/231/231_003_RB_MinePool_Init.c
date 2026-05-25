@@ -1,10 +1,10 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified against NTSC-U 926 overlay 231 0x800abfec-0x800ac0e4.
 void RB_MinePool_Init(void)
 {
 	int i;
 	int numMines;
-	u32 addr;
 	int gameMode;
 
 	LIST_Clear(&D231.minePoolTaken);

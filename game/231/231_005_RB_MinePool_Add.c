@@ -1,5 +1,6 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified against NTSC-U 926 overlay 231 0x800ac13c-0x800ac1b0.
 void RB_MinePool_Add(struct MineWeapon *mw)
 {
 	struct WeaponSlot231 *ws;

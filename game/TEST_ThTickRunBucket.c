@@ -19,3 +19,11 @@ void TEST_ThTickRunBucket(struct Thread *t)
 		t->funcThTick(t);
 	}
 }
+
+// NOTE(aalhendi): Retail ThTick_FastRET unwinds the R3000A scratchpad thread
+// runner. Native thread ticks are normal C calls, so the portable equivalent is
+// just the caller returning normally after this no-op.
+void ThTick_FastRET(struct Thread *t)
+{
+	(void)t;
+}

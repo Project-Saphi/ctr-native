@@ -1,16 +1,17 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified against NTSC-U 926 overlay 231 0x800ac220-0x800ac350.
 struct Instance *RB_Hazard_CollideWithDrivers(struct Instance *weaponInst, char boolCanSkipParent, int hitRadius, struct Instance *mineDriverInst)
 {
-	int i;
 	int j;
 	struct Driver *driver;
 	struct Instance *driverInst;
 
-	int dist[3];
+	u32 dist[3];
 	int modelID;
 
-	int distCheck;
+	u32 distCheck;
+	s32 delta;
 
 	for (int i = 0; i < 8; i++)
 	{
@@ -22,21 +23,10 @@ struct Instance *RB_Hazard_CollideWithDrivers(struct Instance *weaponInst, char 
 			continue;
 		driverInst = driver->instSelf;
 
-		if (
-
-		    // if mine can skip parent
-		    (boolCanSkipParent != 0) &&
-
-		    // then do not check parent
-		    (driverInst == mineDriverInst))
-		{
-			continue;
-		}
-
 		for (j = 0; j < 3; j++)
 		{
-			dist[j] = driverInst->matrix.t[j] - weaponInst->matrix.t[j];
-			dist[j] *= dist[j];
+			delta = driverInst->matrix.t[j] - weaponInst->matrix.t[j];
+			dist[j] = (u32)delta * (u32)delta;
 		}
 
 		modelID = weaponInst->model->id;
@@ -55,11 +45,14 @@ struct Instance *RB_Hazard_CollideWithDrivers(struct Instance *weaponInst, char 
 		}
 
 		// 2D collision, or 3D sphere
-		if (distCheck < hitRadius)
+		if (distCheck < (u32)hitRadius)
 		{
+			if ((boolCanSkipParent != 0) && (driverInst == mineDriverInst))
+				continue;
+
 			// wasted check for 3D sphere,
 			// also upgrades 2D collision to 3D cylinder
-			if (dist[1] < (hitRadius << 2))
+			if ((s32)dist[1] < (s32)((u32)hitRadius << 2))
 			{
 				return driverInst;
 			}

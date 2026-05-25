@@ -1153,7 +1153,7 @@ void *RenderBucket_QueueLevInstances(struct CameraDC *cDC, u_long *otMem, void *
 void *RenderBucket_QueueNonLevInstances(struct Item *item, u_long *otMem, void *rbi, char *lod, char numPlyr, int gameMode1);
 // RenderBucket_QueueDraw()
 void ThTick_RunBucket(struct Thread *thread);
-// ThTick_FastRET()
+void ThTick_FastRET(struct Thread *thread);
 // ThTick_SetAndExec()
 // ThTick_Set()
 

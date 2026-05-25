@@ -1,6 +1,6 @@
 #include <common.h>
 
-// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800ac1b0-0x800ac204.
+// NOTE(aalhendi): ASM-verified against NTSC-U 926 overlay 231 0x800ac1b0-0x800ac220.
 
 int RB_Hazard_HurtDriver(struct Driver *driverVictim, int damageType, struct Driver *driverAttacker, int reason)
 {
@@ -13,8 +13,6 @@ int RB_Hazard_HurtDriver(struct Driver *driverVictim, int damageType, struct Dri
 	}
 	else
 	{
-		// decomp attempt 1 had the second condition of this if statement as: ((gGT->gameMode1 & ADVENTURE_BOSS) != 0)
-		// currently using ((int)gGT->gameMode1 < 0) bc that's what ghidra says (it might be equivalent idk)
 		if ((gGT->levelID == OXIDE_STATION) && (gGT->gameMode1 < 0))
 			damageType = 1;
 

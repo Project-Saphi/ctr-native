@@ -1,5 +1,6 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified against NTSC-U 926 exe 0x8003d024-0x8003d068.
 void MainStats_ClearBattleVS(void)
 {
 	int i;

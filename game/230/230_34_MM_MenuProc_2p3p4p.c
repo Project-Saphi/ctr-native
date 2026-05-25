@@ -1,5 +1,6 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified against NTSC-U 926 overlay 230 0x800ad5e8-0x800ad678.
 void MM_MenuProc_2p3p4p(struct RectMenu *menu)
 {
 	s16 row;
@@ -21,7 +22,7 @@ void MM_MenuProc_2p3p4p(struct RectMenu *menu)
 	else
 	{
 		// row is 0, 1, 2
-		if ((u8)row < 3)
+		if ((row >= 0) && (row < 3))
 		{
 			// row 0 is 2P, row 1 is 3P, row 2 is 4P
 			gGT->numPlyrNextGame = menu->rowSelected + 2;

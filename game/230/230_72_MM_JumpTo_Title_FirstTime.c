@@ -1,14 +1,13 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified against NTSC-U 926 overlay 230 0x800b4364-0x800b43f4.
 void MM_JumpTo_Title_FirstTime(void)
 {
 	struct GameTracker *gGT = sdata->gGT;
 
 	MM_ResetAllMenus();
 
-#ifndef REBUILD_PS1
 	MainStats_ClearBattleVS();
-#endif
 
 #if BUILD == EurRetail
 	// if you have not chose a language or skipped the language menu

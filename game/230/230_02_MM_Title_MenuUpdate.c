@@ -258,6 +258,7 @@ END_FUNCTION:
 	D230.menuDifficulty.posY_curr = D230.title_diffPosY + D230.transitionMeta_Menu[4].currY;
 }
 
+// NOTE(aalhendi): ASM-verified against NTSC-U 926 overlay 230 0x800ac94c-0x800ac9fc.
 void MM_Title_KillThread(void)
 {
 	char n;
@@ -272,7 +273,6 @@ void MM_Title_KillThread(void)
 		for (n = 0; n < 6; n++)
 		{
 			INSTANCE_Death(title->i[n]);
-			title->i[n] = NULL;
 		}
 
 		// kill thread

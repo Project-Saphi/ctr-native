@@ -529,6 +529,7 @@
 #include "game/RefreshCard/RefreshCard_10_Entry.c"
 
 #include "game/SelectProfile/SelectProfile_00_QueueLoadHub_MenuProc.c"
+#include "game/SelectProfile/SelectProfile_03_UI_ConvertX.c"
 #include "game/SelectProfile/SelectProfile_04_UI_ConvertY.c"
 #include "game/SelectProfile/SelectProfile_06_GetTrackID.c"
 #include "game/SelectProfile/SelectProfile_13_Cursors.c"

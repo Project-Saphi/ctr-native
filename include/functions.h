@@ -831,8 +831,8 @@ void RefreshCard_Entry();
 void SelectProfile_QueueLoadHub_MenuProc(struct RectMenu *menu);
 // SelectProfile_ThTick()
 // SelectProfile_PrintInteger()
-// SelectProfile_UI_ConvertX()
-// SelectProfile_UI_ConvertY()
+int SelectProfile_UI_ConvertX(int param_1, int param_2);
+int SelectProfile_UI_ConvertY(int param_1, int param_2);
 // SelectProfile_DrawAdvProfile()
 void SelectProfile_GetTrackID();
 // SelectProfile_Init()

@@ -78,6 +78,8 @@ typedef struct
 
 	ALuint alBuffer;
 	ALuint alSource;
+	float directLeft;
+	float directRight;
 	ushort sampledirty;
 	ushort reverb;
 } SPUALVoice;
@@ -252,6 +254,57 @@ static int Clamp16(int value)
 	if (value < -32768)
 		return -32768;
 	return value;
+}
+
+static float ClampGain(float value)
+{
+	if (value < 0.0f)
+		return 0.0f;
+	if (value > 1.0f)
+		return 1.0f;
+	return value;
+}
+
+static void GetSpuVoiceDirectMix(SPUALVoice *voice, float *leftScale, float *rightScale, float *sourceGain)
+{
+	float left = ClampGain((float)voice->attr.volume.left / 16384.0f);
+	float right = ClampGain((float)voice->attr.volume.right / 16384.0f);
+	float peak = left > right ? left : right;
+
+	if (peak <= 0.0f)
+	{
+		*leftScale = 0.0f;
+		*rightScale = 0.0f;
+		*sourceGain = 0.0f;
+		return;
+	}
+
+	*leftScale = left / peak;
+	*rightScale = right / peak;
+	*sourceGain = peak;
+}
+
+static void ConfigureDirectStereoSource(ALuint source)
+{
+	alSourcei(source, AL_SOURCE_RELATIVE, AL_TRUE);
+	alSource3f(source, AL_POSITION, 0.0f, 0.0f, 0.0f);
+
+	if (alIsExtensionPresent("AL_SOFT_source_spatialize"))
+	{
+		// NOTE(aalhendi): CTR native divergence. Retail SPU/CD audio is a direct
+		// left/right mix; OpenAL 3D panning/HRTF makes centered audio
+		// headphone-dependent.
+		alSourcei(source, AL_SOURCE_SPATIALIZE_SOFT, AL_FALSE);
+	}
+
+	if (alIsExtensionPresent("AL_SOFT_direct_channels_remix"))
+	{
+		alSourcei(source, AL_DIRECT_CHANNELS_SOFT, AL_REMIX_UNMATCHED_SOFT);
+	}
+	else if (alIsExtensionPresent("AL_SOFT_direct_channels"))
+	{
+		alSourcei(source, AL_DIRECT_CHANNELS_SOFT, AL_DROP_UNMATCHED_SOFT);
+	}
 }
 
 static void DecodeXA28Nibbles(const unsigned char *sector, int frameOff, int block, int nibble, int channel, XaDecodeState *state, std::vector<short> &out)
@@ -542,7 +595,7 @@ int PsyX_SPUAL_InitSound()
 		alGenBuffers(1, &voice->alBuffer);
 
 		alSourcei(voice->alSource, AL_SOURCE_RESAMPLER_SOFT, 2);	// Use cubic resampler
-		alSourcei(voice->alSource, AL_SOURCE_RELATIVE, AL_TRUE);
+		ConfigureDirectStereoSource(voice->alSource);
 	}
 
 
@@ -650,6 +703,23 @@ int PsyX_SPUAL_PlayXATrack(int categoryID, int xaID, int volumeLeft, int volumeR
 	if (!DecodeXAFile(data.data(), (int)data.size(), info.channelFilter, info.numSectors, pcm, &sampleRate, &numChannels))
 		return 0;
 
+	if (numChannels == 1)
+	{
+		// NOTE(aalhendi): CTR native divergence. Retail CD-XA is a direct
+		// left/right CD mix, not a positional source. Expand mono XA to dual-mono
+		// so OpenAL headphone/HRTF output cannot collapse it to one ear.
+		std::vector<short> stereoPcm;
+		stereoPcm.reserve(pcm.size() * 2);
+		for (size_t i = 0; i < pcm.size(); i++)
+		{
+			stereoPcm.push_back(pcm[i]);
+			stereoPcm.push_back(pcm[i]);
+		}
+
+		pcm.swap(stereoPcm);
+		numChannels = 2;
+	}
+
 	SDL_LockMutex(g_SpuMutex);
 
 	if (g_XaSource == 0)
@@ -661,7 +731,7 @@ int PsyX_SPUAL_PlayXATrack(int categoryID, int xaID, int volumeLeft, int volumeR
 	ALenum format = (numChannels == 2) ? AL_FORMAT_STEREO16 : AL_FORMAT_MONO16;
 	alBufferData(g_XaBuffer, format, pcm.data(), (ALsizei)(pcm.size() * sizeof(short)), sampleRate);
 	alSourcei(g_XaSource, AL_BUFFER, g_XaBuffer);
-	alSourcei(g_XaSource, AL_SOURCE_RELATIVE, AL_TRUE);
+	ConfigureDirectStereoSource(g_XaSource);
 
 	int volume = (volumeLeft + volumeRight) / 2;
 	float gain = (float)volume / 16384.0f;
@@ -899,6 +969,7 @@ static int decodeSound(u_char* iData, int soundSize, short* oData, int* loopStar
 static void UpdateVoiceSample(SPUALVoice* voice)
 {
 	static short waveBuffer[SPU_REALMEMSIZE];
+	static short stereoBuffer[SPU_REALMEMSIZE * 2];
 	int loopStart, loopLen, count;
 	ALuint alSource, alBuffer;
 
@@ -920,6 +991,20 @@ static void UpdateVoiceSample(SPUALVoice* voice)
 
 	if (count == 0)
 		return;
+
+	float leftScale;
+	float rightScale;
+	float sourceGain;
+	GetSpuVoiceDirectMix(voice, &leftScale, &rightScale, &sourceGain);
+
+	for (int i = 0; i < count; i++)
+	{
+		stereoBuffer[i * 2] = (short)Clamp16((int)roundf((float)waveBuffer[i] * leftScale));
+		stereoBuffer[i * 2 + 1] = (short)Clamp16((int)roundf((float)waveBuffer[i] * rightScale));
+	}
+
+	voice->directLeft = leftScale;
+	voice->directRight = rightScale;
 
 #if 0	// sample test
 	{
@@ -952,7 +1037,9 @@ static void UpdateVoiceSample(SPUALVoice* voice)
 #endif
 
 	alSourcei(alSource, AL_BUFFER, 0);
-	alBufferData(alBuffer, AL_FORMAT_MONO16, waveBuffer, count * sizeof(short), 44100);
+	alBufferData(alBuffer, AL_FORMAT_STEREO16, stereoBuffer, count * 2 * sizeof(short), 44100);
+	ConfigureDirectStereoSource(alSource);
+	alSourcef(alSource, AL_GAIN, sourceGain);
 
 	if (loopLen > 0)
 	{
@@ -1003,8 +1090,6 @@ void PsyX_SPUAL_SetVoiceAttr(SpuVoiceAttr* psxAttrib)
 	if (!g_spuInit)
 		return;
 
-	const float STEREO_FACTOR = 3.0f;
-	
 	SDL_LockMutex(g_SpuMutex);
 
 	for (int i = 0; i < s_spuVoiceCount; i++)
@@ -1017,7 +1102,7 @@ void PsyX_SPUAL_SetVoiceAttr(SpuVoiceAttr* psxAttrib)
 
 		if (alSource == AL_NONE)
 			continue;
-		
+
 		// update sample
 		if ((psxAttrib->mask & SPU_VOICE_WDSA) || (psxAttrib->mask & SPU_VOICE_LSAX))
 		{
@@ -1047,20 +1132,15 @@ void PsyX_SPUAL_SetVoiceAttr(SpuVoiceAttr* psxAttrib)
 			if (psxAttrib->mask & SPU_VOICE_VOLR)
 				voice->attr.volume.right = psxAttrib->volume.right;
 
-			float left_gain = (float)(voice->attr.volume.left) / (float)(16384);
-			float right_gain = (float)(voice->attr.volume.right) / (float)(16384);
+			float leftScale;
+			float rightScale;
+			float sourceGain;
+			GetSpuVoiceDirectMix(voice, &leftScale, &rightScale, &sourceGain);
 
-			if(left_gain > 1.0f)
-				left_gain = 1.0f;
+			if ((fabsf(leftScale - voice->directLeft) > 0.001f) || (fabsf(rightScale - voice->directRight) > 0.001f))
+				voice->sampledirty++;
 
-			if(right_gain > 1.0f)
-				right_gain = 1.0f;
-
-			float pan = (acosf(left_gain) + asinf(right_gain)) / ((float)(M_PI)); // average angle in [0,1]
-			pan = 2.0f * pan - 1.0f; // convert to [-1, 1]
-			pan = pan * 0.5f; // 0.5 = sin(30') for a +/- 30 degree arc
-			alSource3f(alSource, AL_POSITION, pan * STEREO_FACTOR, 0, -sqrtf(1.0f - pan * pan));
-			alSourcef(alSource, AL_GAIN, (left_gain+right_gain)*0.5f);
+			alSourcef(alSource, AL_GAIN, sourceGain);
 		}
 
 		// update pitch

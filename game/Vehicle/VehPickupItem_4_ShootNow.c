@@ -13,6 +13,8 @@ void RB_Warpball_SeekDriver(struct TrackerWeapon *tw, u32 param_2, struct Driver
 
 void DECOMP_VehPickupItem_ShootNow(struct Driver *d, int weaponID, int flags)
 {
+	// NOTE(aalhendi): Retail-backed audio/item dispatch corrections for NTSC-U 926
+	// 0x8006540c-0x800666e4. TODO(aalhendi): complete the full ASM pass.
 	struct Instance *dInst;
 	struct Thread *weaponTh;
 	struct Instance *weaponInst;
@@ -42,16 +44,10 @@ void DECOMP_VehPickupItem_ShootNow(struct Driver *d, int weaponID, int flags)
 		gGT->numMissiles++;
 		d->numTimesMissileLaunched++;
 
-#if !defined(REBUILD_PS1) || defined(CTR_NATIVE)
 		GAMEPAD_ShockFreq(d, 8, 0);
 		GAMEPAD_ShockForce1(d, 8, 0x7f);
-#endif
 
-#if !defined(REBUILD_PS1) || defined(CTR_NATIVE)
 		struct Driver *victim = VehPickupItem_MissileGetTargetDriver(d);
-#else
-		struct Driver *victim = 0;
-#endif
 
 		// if driver not found
 		if (victim == 0)
@@ -142,9 +138,7 @@ void DECOMP_VehPickupItem_ShootNow(struct Driver *d, int weaponID, int flags)
 		weaponInst->matrix.t[1] = dInst->matrix.t[1];
 		weaponInst->matrix.t[2] = dInst->matrix.t[2];
 
-#if !defined(REBUILD_PS1) || defined(CTR_NATIVE)
 		VehPhysForce_RotAxisAngle(&weaponInst->matrix, (s16 *)&d->AxisAngle1_normalVec, d->rotCurr.y);
-#endif
 
 		weaponTh = weaponInst->thread;
 		weaponTh->funcThDestroy = DECOMP_PROC_DestroyTracker;
@@ -167,8 +161,6 @@ void DECOMP_VehPickupItem_ShootNow(struct Driver *d, int weaponID, int flags)
 			talk = 10;
 			d->instBombThrow = weaponInst;
 
-#if !defined(REBUILD_PS1) || defined(CTR_NATIVE)
-
 			// Original Code
 			s16 rot[3];
 			CTR_MatrixToRot((SVECTOR *)&rot[0], &weaponInst->matrix, 0x11);
@@ -179,15 +171,6 @@ void DECOMP_VehPickupItem_ShootNow(struct Driver *d, int weaponID, int flags)
 			tw->dir[2] = rot[2];
 
 			PlaySound3D(0x47, weaponInst);
-
-#else
-
-			// rigged for Cortex Castle
-			tw->dir[0] = 0;
-			tw->dir[1] = -1024;
-			tw->dir[2] = 0;
-
-#endif
 		}
 
 		// missile
@@ -199,17 +182,13 @@ void DECOMP_VehPickupItem_ShootNow(struct Driver *d, int weaponID, int flags)
 				if (victim->thTrackingMe == 0)
 					victim->thTrackingMe = DECOMP_RB_GetThread_ClosestTracker(victim);
 
-#if !defined(REBUILD_PS1) || defined(CTR_NATIVE)
 			PlaySound3D(0x4a, weaponInst);
-#endif
 		}
 
 		// if human and not AI
 		if ((d->actionsFlagSet & 0x100000) == 0)
 		{
-#if !defined(REBUILD_PS1) || defined(CTR_NATIVE)
 			Voiceline_RequestPlay(talk, data.characterIDs[d->driverID], 0x10);
-#endif
 		}
 
 		tw->rotY = d->rotCurr.y;
@@ -260,7 +239,6 @@ void DECOMP_VehPickupItem_ShootNow(struct Driver *d, int weaponID, int flags)
 		tw->frameCount_Blind = 0;
 		break;
 
-#if !defined(REBUILD_PS1) || defined(CTR_NATIVE)
 	// TNT/Nitro
 	case 3:
 
@@ -470,7 +448,6 @@ void DECOMP_VehPickupItem_ShootNow(struct Driver *d, int weaponID, int flags)
 		}
 		break;
 
-#if !defined(REBUILD_PS1) || defined(CTR_NATIVE)
 	// Shield Bubble
 	case 6:
 
@@ -533,7 +510,6 @@ void DECOMP_VehPickupItem_ShootNow(struct Driver *d, int weaponID, int flags)
 
 		OtherFX_Play(0x57, 1);
 		break;
-#endif
 
 	// Mask
 	case 7:
@@ -581,7 +557,6 @@ void DECOMP_VehPickupItem_ShootNow(struct Driver *d, int weaponID, int flags)
 		}
 		break;
 
-#if !defined(REBUILD_PS1) || defined(CTR_NATIVE)
 	// Warpball
 	case 9:
 
@@ -690,8 +665,6 @@ void DECOMP_VehPickupItem_ShootNow(struct Driver *d, int weaponID, int flags)
 			p->unk18 = 250;
 
 		break;
-#endif
-#endif
 
 	// invisibility
 	case 0xc:

@@ -32,8 +32,7 @@ static void Vector_LightMatrixMul(MATRIX *matrix, const SVec3 *input, SVec3 *out
 
 void Vector_SpecLightNoSpin3D(struct Instance *inst, s16 *rot, s16 *lightDir)
 {
-	// NOTE(aalhendi): Source-backed NTSC-U 926 0x800576b8-0x80057884.
-	// TODO(aalhendi): Complete exact ASM pass after ConvertRotToMatrix_Transpose is ported.
+	// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800576b8-0x80057884.
 	MATRIX rotMatrix;
 	MATRIX lightMatrix;
 	SVec3 light = {.x = lightDir[0], .y = lightDir[1], .z = lightDir[2]};

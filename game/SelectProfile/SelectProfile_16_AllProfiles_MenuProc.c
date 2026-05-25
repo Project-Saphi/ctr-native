@@ -131,6 +131,7 @@ static void SelectProfile_DrawOverwriteGhost(struct RectMenu *menu)
 	{
 		if (data.menuOverwriteGhost.rowSelected > 0)
 		{
+			// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800491c8-0x800491d4 for overwrite prompt cursor-up SFX.
 			DECOMP_OtherFX_Play(0, 1);
 			data.menuOverwriteGhost.rowSelected--;
 		}
@@ -139,17 +140,20 @@ static void SelectProfile_DrawOverwriteGhost(struct RectMenu *menu)
 	{
 		if (data.menuOverwriteGhost.rowSelected < 1)
 		{
+			// NOTE(aalhendi): ASM-verified NTSC-U 926 0x80049204-0x80049210 for overwrite prompt cursor-down SFX.
 			DECOMP_OtherFX_Play(0, 1);
 			data.menuOverwriteGhost.rowSelected++;
 		}
 	}
 	else if ((tap & (BTN_TRIANGLE | BTN_SQUARE)) != 0)
 	{
+		// NOTE(aalhendi): ASM-verified NTSC-U 926 0x80049268-0x80049270 for overwrite prompt back SFX.
 		DECOMP_OtherFX_Play(2, 1);
 		*SelectProfile_AllProfiles_OverwritePrompt() = 0;
 	}
 	else if ((tap & (BTN_CROSS | BTN_CIRCLE)) != 0)
 	{
+		// NOTE(aalhendi): ASM-verified NTSC-U 926 0x80049240-0x80049248 for overwrite prompt confirm SFX.
 		DECOMP_OtherFX_Play(1, 1);
 		if (data.menuOverwriteGhost.rowSelected == 0)
 			SelectProfile_SaveGhostFromRow(menu);
@@ -213,6 +217,7 @@ static void SelectProfile_HandleGhostSelection(struct RectMenu *menu, int rowCou
 		return;
 	}
 
+	// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800498a8-0x800498b0 for invalid ghost-track SFX.
 	DECOMP_OtherFX_Play(5, 1);
 }
 

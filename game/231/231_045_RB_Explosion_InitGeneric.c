@@ -2,14 +2,16 @@
 
 void RB_Explosion_ThTick(struct Thread *t);
 
-// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800b1630-0x800b1714.
+static char s_explosion1[] = "explosion1";
+
+// NOTE(aalhendi): ASM-verified against NTSC-U 926 overlay 231 0x800b1630-0x800b1714.
 void RB_Explosion_InitGeneric(struct Instance *inst)
 {
 	struct Instance *explosion;
 	u32 color;
 
 	// create thread for explosion
-	explosion = INSTANCE_BirthWithThread(0x26, 0, SMALL, OTHER, RB_Explosion_ThTick, 0, 0);
+	explosion = INSTANCE_BirthWithThread(0x26, s_explosion1, SMALL, OTHER, RB_Explosion_ThTick, 0, 0);
 
 	// copy position and rotation from one instance to the other
 	*(int *)&explosion->matrix.m[0][0] = *(int *)&inst->matrix.m[0][0];

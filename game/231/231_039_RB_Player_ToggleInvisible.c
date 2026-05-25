@@ -1,5 +1,6 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified against NTSC-U 926 overlay 231 0x800b0dbc-0x800b0e68.
 void RB_Player_ToggleInvisible(void)
 {
 	struct GameTracker *gGT = sdata->gGT;

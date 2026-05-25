@@ -1,5 +1,6 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified against NTSC-U 926 overlay 231 0x800b38e4-0x800b3978.
 void RB_Blade_ThTick(struct Thread *t)
 {
 	struct Blade *bladeObj;
@@ -22,7 +23,5 @@ void RB_Blade_ThTick(struct Thread *t)
 	bladeInst->scale[1] = 0x1000;
 	bladeInst->scale[2] = 0x1000;
 
-	// do not use infinite loop optimization,
-	// modern GCC "without" the $RA skip is more
-	// optimized than PSYQ "with" the $RA skip
+	ThTick_FastRET(t);
 }

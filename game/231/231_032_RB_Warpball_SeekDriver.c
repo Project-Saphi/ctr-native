@@ -1,6 +1,6 @@
 #include <common.h>
 
-// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800aece0-0x800aede0.
+// NOTE(aalhendi): ASM-verified against NTSC-U 926 overlay 231 0x800aece0-0x800aede0.
 void RB_Warpball_SeekDriver(struct TrackerWeapon *tw, u32 param_2, struct Driver *d)
 {
 	param_2 &= 0xff;

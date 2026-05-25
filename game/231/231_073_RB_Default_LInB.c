@@ -1,6 +1,6 @@
 #include <common.h>
 
-// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800b4fe4-0x800b5090.
+// NOTE(aalhendi): ASM-verified against NTSC-U 926 overlay 231 0x800b4fe4-0x800b5090.
 
 void RB_Default_LInB(struct Instance *inst)
 {
@@ -26,9 +26,7 @@ void RB_Default_LInB(struct Instance *inst)
 	*(s16 *)&scratch[0x10a] = var - 0x180;
 	*(s16 *)&scratch[0x112] = var + 0x80;
 
-	COLL_SearchBSP_CallbackQUADBLK(
-	    (u32 *)&scratch[0x108], (u32 *)&scratch[0x110], (struct ScratchpadStruct *)&scratch[0x118],
-	    0); // this scratchpadstruct is +0x118 from 0x1f800000, that may be a problem? all other function calls I've seen just pass 0x1f800000
+	COLL_SearchBSP_CallbackQUADBLK((u32 *)&scratch[0x108], (u32 *)&scratch[0x110], (struct ScratchpadStruct *)&scratch[0x118], 0);
 
 	RB_MakeInstanceReflective((struct ScratchpadStruct *)&scratch[0x118], inst);
 }

@@ -33,6 +33,8 @@ CdlFILE *pcCdSearchFile(CdlFILE *loc, const char *filename)
 {
 #ifdef REBUILD_PC
 	int v1;
+	char *ownedFilename;
+	int fileSize;
 #else
 	// because this API is STRANGE
 	register int v1 asm("v1");
@@ -41,10 +43,13 @@ CdlFILE *pcCdSearchFile(CdlFILE *loc, const char *filename)
 	// Turn "\\BIGFILE.BIG;1" into "BIGFILE.BIG"
 
 #ifdef REBUILD_PC
-	// stupid access violation
-	char *str2 = malloc(strlen(filename + 1));
-	strcpy(str2, filename);
-	filename = str2;
+	// NOTE(aalhendi): Native PCDRV normalizes the path in-place below.
+	ownedFilename = malloc(strlen(filename) + 1);
+	if (ownedFilename == NULL)
+		return NULL;
+
+	strcpy(ownedFilename, filename);
+	filename = ownedFilename;
 #endif
 
 	char *str = filename;
@@ -69,12 +74,29 @@ CdlFILE *pcCdSearchFile(CdlFILE *loc, const char *filename)
 		if (v1 == -1)
 			v1 = PCopen(&filename[1], PCDRV_MODE_READ);
 	}
+
+	if (v1 == -1)
+	{
+		free(ownedFilename);
+		return NULL;
+	}
+
+	fileSize = PClseek(v1, 0, PCDRV_SEEK_END);
+	PClseek(v1, 0, PCDRV_SEEK_SET);
+
+	if (fileSize < 0)
+	{
+		PCclose(v1);
+		free(ownedFilename);
+		return NULL;
+	}
 #else
 	v1 = PCopen(&filename[1], PCDRV_MODE_READ);
 #endif
 
 #ifdef REBUILD_PC
 	fileFD[fileCount] = v1;
+	loc->size = fileSize;
 #else
 	fileFD[fileCount] = fileCount;
 #endif
@@ -84,6 +106,12 @@ CdlFILE *pcCdSearchFile(CdlFILE *loc, const char *filename)
 	// top 1 byte is fd
 	// bottom 3 bytes is sectorIndex
 	*(int *)&loc->pos = fileCount << 24;
+
+#ifdef REBUILD_PC
+	memset(loc->name, 0, sizeof(loc->name));
+	strncpy(loc->name, filename[0] == '/' ? &filename[1] : filename, sizeof(loc->name) - 1);
+	free(ownedFilename);
+#endif
 
 	fileCount++;
 

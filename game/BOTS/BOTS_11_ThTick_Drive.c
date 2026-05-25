@@ -965,7 +965,7 @@ give_this_label_a_better_name2:
 
 	if ((navFrameFlags & 0x1) != 0)
 	{
-		VehFire_Increment(botDriver, 0x2d0, 1, 0x900);
+		VehFire_Increment(botDriver, 0x2d0, 1, 0x180);
 
 		botDriver->botData.botFlags |= 0x10;
 	}

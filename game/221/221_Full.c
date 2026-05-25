@@ -164,6 +164,7 @@ void DECOMP_CC_EndEvent_DrawMenu()
 	// play unlock sound after exactly 1 second
 	else if (elapsedFrames == 30)
 	{
+		// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8009fa24-0x8009fa2c for crystal token unlock SFX.
 		DECOMP_OtherFX_Play(0x67, 1);
 	}
 

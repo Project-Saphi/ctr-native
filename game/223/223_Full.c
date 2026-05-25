@@ -236,6 +236,7 @@ void DECOMP_RR_EndEvent_DrawMenu(void)
 			if (elapsedFrames == 251)
 			{
 				// play sound of unlocking relic
+				// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800a04cc-0x800a04d4 for relic unlock SFX.
 				DECOMP_OtherFX_Play(0x67, 1);
 			}
 
@@ -315,6 +316,7 @@ void DECOMP_RR_EndEvent_DrawMenu(void)
 				// 0 frames after the first 80
 				if (elapsedFrames == 0)
 				{
+					// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800a07e8-0x800a07f0 for PERFECT fly-in SFX.
 					DECOMP_OtherFX_Play(0x65, 1);
 				}
 			}
@@ -365,6 +367,7 @@ void DECOMP_RR_EndEvent_DrawMenu(void)
 					{
 						// subtract a second
 						d->timeElapsedInRace -= 960;
+						// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800a08e0-0x800a08f4 for relic countdown tick SFX.
 						DECOMP_OtherFX_Play(99, 1);
 					}
 

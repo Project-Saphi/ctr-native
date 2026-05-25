@@ -132,6 +132,7 @@ void DECOMP_AA_EndEvent_DrawMenu(void)
 						hudToken->scale[2] += 0x200;
 					}
 
+					// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8009fc48-0x8009fc50 for CTR token unlock SFX.
 					if (hudC->scale[0] == 0x800)
 						DECOMP_OtherFX_Play(0x67, 1);
 

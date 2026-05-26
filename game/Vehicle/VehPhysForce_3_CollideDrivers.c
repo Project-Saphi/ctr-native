@@ -11,7 +11,7 @@ struct VehPhysForce_CollideDrivers_Search
 	s16 hitDir[4];
 };
 
-// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8005ebac-0x8005ee34
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8005ebac-0x8005ee34.
 void VehPhysForce_CollideDrivers(struct Thread *thread, struct Driver *driver)
 {
 	u32 stepFlagSet = driver->stepFlagSet;

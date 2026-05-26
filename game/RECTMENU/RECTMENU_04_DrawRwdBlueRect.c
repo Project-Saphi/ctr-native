@@ -1,5 +1,6 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x80045254-0x800453e8.
 void RECTMENU_DrawRwdBlueRect(RECT *rect, char *metas, u_long *ot, struct PrimMem *primMem)
 {
 	s16 pos[4];
@@ -9,9 +10,9 @@ void RECTMENU_DrawRwdBlueRect(RECT *rect, char *metas, u_long *ot, struct PrimMe
 	pos[0] = rect->x;
 	pos[2] = rect->w;
 
-	for (int i = 0; metas[i * 4 + 3] != 0x64; i++)
+	for (int i = 0; (u8)metas[i * 4 + 3] != 0x64; i++)
 	{
-		char *meta = &metas[i * 4];
+		u8 *meta = (u8 *)&metas[i * 4];
 		gradient[0] = *(int *)&meta[0];
 		gradient[1] = *(int *)&meta[4];
 		colors[0] = gradient[0];

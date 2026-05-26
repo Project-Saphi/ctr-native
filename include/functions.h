@@ -100,7 +100,7 @@ u32 COLL_MOVED_ScrubImpact(struct Driver *d, struct Thread *t, struct Scratchpad
 // CTR
 
 void CTR_Box_DrawWirePrims(Point p1, Point p2, Color color, void *ot);
-void CTR_Box_DrawWireBox(RECT *r, Color color, void *ot);
+void CTR_Box_DrawWireBox(RECT *r, const Color *color, void *ot, struct PrimMem *primMem);
 void CTR_Box_DrawClearBox(RECT *r, Color *color, int transparency, u_long *ot);
 void CTR_Box_DrawSolidBox(RECT *r, Color color, u_long *ot);
 void CTR_CycleTex_LEV(struct AnimTex *animtex, int timer);

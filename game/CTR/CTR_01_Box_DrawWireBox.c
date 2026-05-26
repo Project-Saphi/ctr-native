@@ -1,17 +1,18 @@
 #include <common.h>
 
-void CTR_Box_DrawWireBox(RECT *r, Color color, void *ot)
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x80021594-0x8002177c.
+void CTR_Box_DrawWireBox(RECT *r, const Color *color, void *ot, struct PrimMem *primMem)
 {
-	LineF3 *p;
-	GetPrimMem(p);
-	if (p == nullptr)
+	LineF3 *p = primMem->curr;
+	if (p > (LineF3 *)primMem->endMin100)
 	{
 		return;
 	}
+	primMem->curr = p + 1;
 
 	const PrimCode primCode = {.line = {.renderCode = RenderCode_Line, .polyline = 1}};
-	color.code = primCode;
-	p->colorCode = color;
+	p->colorCode = *color;
+	p->colorCode.code = primCode;
 
 	s16 topX = r->x;
 	s16 topY = r->y;
@@ -26,13 +27,15 @@ void CTR_Box_DrawWireBox(RECT *r, Color color, void *ot)
 	p->end = 0x55555555;
 
 	AddPrimitive(p, ot);
-	GetPrimMem(p);
-	if (p == nullptr)
+	p = primMem->curr;
+	if (p > (LineF3 *)primMem->endMin100)
 	{
 		return;
 	}
+	primMem->curr = p + 1;
 
-	p->colorCode = color;
+	p->colorCode = *color;
+	p->colorCode.code = primCode;
 	p->v[0].pos.x = topX;
 	p->v[0].pos.y = topY;
 	p->v[1].pos.x = topX;

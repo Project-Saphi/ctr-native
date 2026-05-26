@@ -22,7 +22,8 @@ void UI_DrawSlideMeter(s16 posX, s16 posY, struct Driver *driver)
 	box.y = topY;
 	box.w = barWidth;
 	box.h = barHeight;
-	CTR_Box_DrawWireBox(&box, MakeColor(0, 0, 0), gGT->pushBuffer_UI.ptrOT);
+	Color black = MakeColor(0, 0, 0);
+	CTR_Box_DrawWireBox(&box, &black, gGT->pushBuffer_UI.ptrOT, &gGT->backBuffer->primMem);
 
 	const PrimCode primCode = {.poly = {.quad = 1, .renderCode = RenderCode_Polygon}};
 	ColorCode colorCode = MakeColorCode(0xFF, 0, 0, primCode); // red color, ready to boost

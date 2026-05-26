@@ -42,7 +42,7 @@ void UI_JumpMeter_Draw(s16 posX, s16 posY, struct Driver *driver)
 
 	Color color;
 	color.self = data.colors[21][0];
-	CTR_Box_DrawWireBox(&box, color, gGT->pushBuffer_UI.ptrOT);
+	CTR_Box_DrawWireBox(&box, &color, gGT->pushBuffer_UI.ptrOT, &gGT->backBuffer->primMem);
 
 	backDB = gGT->backBuffer;
 	primmemCurr = backDB->primMem.curr;
@@ -79,7 +79,7 @@ void UI_JumpMeter_Draw(s16 posX, s16 posY, struct Driver *driver)
 		box2.h = barHeight;
 		box2.x = posX;
 
-		CTR_Box_DrawWireBox(&box2, color, gGT->pushBuffer_UI.ptrOT);
+		CTR_Box_DrawWireBox(&box2, &color, gGT->pushBuffer_UI.ptrOT, &backDB->primMem);
 
 		backDB = gGT->backBuffer;
 		primmemCurr = backDB->primMem.curr;

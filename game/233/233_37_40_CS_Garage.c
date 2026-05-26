@@ -49,7 +49,8 @@ void CS_Garage_MenuProc(struct RectMenu *param_1)
 	struct MetaDataCHAR *MDC = &data.MetaDataCharacters[currCharacterID];
 	int nameIndex = MDC->name_LNG_long;
 	RECT r;
-
+	Color white = MakeColor(0xFF, 0xFF, 0xFF);
+	Color black = MakeColor(0, 0, 0);
 
 	// CameraDC, freecam mode
 	gGT->cameraDC[0].cameraMode = 3;
@@ -147,7 +148,7 @@ void CS_Garage_MenuProc(struct RectMenu *param_1)
 		r.h = 7;
 
 		// outline color white at 0x800b7780
-		CTR_Box_DrawWireBox(&r, MakeColor(0xFF, 0xFF, 0xFF), gGT->pushBuffer_UI.ptrOT);
+		CTR_Box_DrawWireBox(&r, &white, gGT->pushBuffer_UI.ptrOT, primMem);
 
 		// bar shadows
 		r.x = statBarPosX + 1;
@@ -156,7 +157,7 @@ void CS_Garage_MenuProc(struct RectMenu *param_1)
 		r.h = 5;
 
 		// outline color black (shadows)
-		CTR_Box_DrawWireBox(&r, MakeColor(0, 0, 0), gGT->pushBuffer_UI.ptrOT);
+		CTR_Box_DrawWireBox(&r, &black, gGT->pushBuffer_UI.ptrOT, primMem);
 
 		int segmentLen = 13;
 		int segmentStart = 0;

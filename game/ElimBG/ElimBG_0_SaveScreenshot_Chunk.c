@@ -1,5 +1,6 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x80024524-0x8002459c.
 void ElimBG_SaveScreenshot_Chunk(u16 *param_1, u16 *param_2, int param_3)
 {
 	u16 uVar1;

@@ -1,5 +1,6 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x80024c08-0x80024c4c.
 void ElimBG_Deactivate(struct GameTracker *gGT)
 {
 	// it's written this way for bytebudget reasons.

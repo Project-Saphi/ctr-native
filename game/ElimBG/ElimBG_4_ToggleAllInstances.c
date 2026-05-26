@@ -1,5 +1,6 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800248bc-0x80024974.
 void ElimBG_ToggleAllInstances(struct GameTracker *gGT, int boolGameIsPaused)
 {
 	struct Level *lev;

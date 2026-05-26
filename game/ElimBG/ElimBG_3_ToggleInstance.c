@@ -1,5 +1,6 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x80024840-0x800248bc.
 void ElimBG_ToggleInstance(struct Instance *inst, char boolGameIsPaused)
 {
 	u32 flags;

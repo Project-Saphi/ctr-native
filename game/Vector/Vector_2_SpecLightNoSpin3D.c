@@ -1,21 +1,5 @@
 #include <common.h>
 
-static void Vector_TransposeMatrix(MATRIX *dst, const MATRIX *src)
-{
-	dst->m[0][0] = src->m[0][0];
-	dst->m[0][1] = src->m[1][0];
-	dst->m[0][2] = src->m[2][0];
-	dst->m[1][0] = src->m[0][1];
-	dst->m[1][1] = src->m[1][1];
-	dst->m[1][2] = src->m[2][1];
-	dst->m[2][0] = src->m[0][2];
-	dst->m[2][1] = src->m[1][2];
-	dst->m[2][2] = src->m[2][2];
-	dst->t[0] = 0;
-	dst->t[1] = 0;
-	dst->t[2] = 0;
-}
-
 static void Vector_LightMatrixMul(MATRIX *matrix, const SVec3 *input, SVec3 *output)
 {
 	VECTOR mac;
@@ -33,15 +17,13 @@ static void Vector_LightMatrixMul(MATRIX *matrix, const SVec3 *input, SVec3 *out
 void Vector_SpecLightNoSpin3D(struct Instance *inst, s16 *rot, s16 *lightDir)
 {
 	// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800576b8-0x80057884.
-	MATRIX rotMatrix;
 	MATRIX lightMatrix;
 	SVec3 light = {.x = lightDir[0], .y = lightDir[1], .z = lightDir[2]};
 	SVec3 lightLocal;
 	struct GameTracker *gGT = sdata->gGT;
 	struct InstDrawPerPlayer *idpp = INST_GETIDPP(inst);
 
-	ConvertRotToMatrix(&rotMatrix, rot);
-	Vector_TransposeMatrix(&lightMatrix, &rotMatrix);
+	ConvertRotToMatrix(&lightMatrix, rot);
 	Vector_LightMatrixMul(&lightMatrix, &light, &lightLocal);
 
 	inst->unk53 = (char)lightLocal.x;

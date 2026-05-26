@@ -746,6 +746,8 @@
 #include "game/Vehicle/VehStuckProc_17_Tumble_PhysAngular.c"
 #include "game/Vehicle/VehStuckProc_18_Tumble_Animate.c"
 #include "game/Vehicle/VehStuckProc_19_Tumble_Init.c"
+#include "game/Vehicle/VehStuckProc_20_Warp_MoveDustPuff.c"
+#include "game/Vehicle/VehStuckProc_21_Warp_AddDustPuff1.c"
 
 #include "game/Vehicle/VehTurbo_0_ProcessBucket.c"
 #include "game/Vehicle/VehTurbo_1_ThDestroy.c"

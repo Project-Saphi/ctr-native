@@ -1,6 +1,6 @@
 #include <common.h>
 
-// Electric particles spin in circle under driver
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800685b0-0x80068644.
 void VehStuckProc_Warp_AddDustPuff1(struct ScratchpadStruct *sps)
 {
 	struct GameTracker *gGT = sdata->gGT;

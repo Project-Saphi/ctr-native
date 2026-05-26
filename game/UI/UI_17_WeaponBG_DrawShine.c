@@ -1,6 +1,8 @@
 #include <common.h>
 
-void UI_WeaponBG_DrawShine(struct Icon *icon, s16 posX, s16 posY, struct PrimMem *primMem, u_long *ot, char param_6, s16 param_7, s16 param_8, int param9)
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8004e37c-0x8004e660.
+void UI_WeaponBG_DrawShine(struct Icon *icon, s16 posX, s16 posY, struct PrimMem *primMem, u_long *ot, char transparency, s16 angleX, s16 angleY,
+                           int unusedColor)
 {
 	s16 sVar1;
 	s16 sVar2;
@@ -13,22 +15,24 @@ void UI_WeaponBG_DrawShine(struct Icon *icon, s16 posX, s16 posY, struct PrimMem
 	s16 sVar11;
 	s16 sVar12;
 
+	(void)unusedColor;
+
 	u32 *wumpaShine = (u32 *)&sdata->wumpaShineColor1[0][0];
 
-	if (param_6 == 3)
+	if (transparency == 3)
 	{
 		wumpaShine = (u32 *)&sdata->wumpaShineColor2[0][0];
 	}
 
-	sVar3 = (s16)(((icon->texLayout.u1 - icon->texLayout.u0) * (int)param_7) >> 0xc);
+	sVar3 = (s16)(((icon->texLayout.u1 - icon->texLayout.u0) * (int)angleX) >> 0xc);
 	sVar1 = posX + sVar3;
-	param_7 = param_7 >> 0xc;
-	sVar12 = sVar1 - param_7;
+	angleX = angleX >> 0xc;
+	sVar12 = sVar1 - angleX;
 
-	sVar4 = (s16)(((icon->texLayout.v2 - icon->texLayout.v0) * (int)param_8) >> 0xc);
+	sVar4 = (s16)(((icon->texLayout.v2 - icon->texLayout.v0) * (int)angleY) >> 0xc);
 	sVar2 = posY + sVar4;
-	param_8 = param_8 >> 0xc;
-	sVar11 = sVar2 - param_8;
+	angleY = angleY >> 0xc;
+	sVar11 = sVar2 - angleY;
 
 	// loop 4 times
 	for (i = 0; i < 4; i++)
@@ -58,7 +62,7 @@ void UI_WeaponBG_DrawShine(struct Icon *icon, s16 posX, s16 posY, struct PrimMem
 		// top right
 		case 1:
 			// xy0
-			sVar5 = (posX + sVar3 * 2) - param_7;
+			sVar5 = (posX + sVar3 * 2) - angleX;
 			p->x0 = sVar5;
 			p->y0 = posY;
 
@@ -73,7 +77,7 @@ void UI_WeaponBG_DrawShine(struct Icon *icon, s16 posX, s16 posY, struct PrimMem
 
 		case 2:
 			// xy0
-			sVar5 = (posY + sVar4 * 2) - param_8;
+			sVar5 = (posY + sVar4 * 2) - angleY;
 			p->x0 = posX;
 			p->y0 = sVar5;
 
@@ -88,8 +92,8 @@ void UI_WeaponBG_DrawShine(struct Icon *icon, s16 posX, s16 posY, struct PrimMem
 
 		case 3:
 			// xy0
-			sVar5 = (posX + sVar3 * 2) - param_7;
-			sVar6 = (posY + sVar4 * 2) - param_8;
+			sVar5 = (posX + sVar3 * 2) - angleX;
+			sVar6 = (posY + sVar4 * 2) - angleY;
 			p->x0 = sVar5;
 			p->y0 = sVar6;
 
@@ -111,12 +115,9 @@ void UI_WeaponBG_DrawShine(struct Icon *icon, s16 posX, s16 posY, struct PrimMem
 
 		setPolyGT4(p);
 
-// always true
-#if 0
-        if (param_6 != 0)
-#endif
+		if (transparency != 0)
 		{
-			p->tpage = (p->tpage & ~(0x60)) | (((u16)param_6 - 1) * 0x20);
+			p->tpage = (p->tpage & ~(0x60)) | (((u16)transparency - 1) * 0x20);
 			p->code |= 2;
 		}
 

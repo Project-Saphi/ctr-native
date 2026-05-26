@@ -53,7 +53,7 @@ static struct VehPhysForceTrigPair VehPhysForce_TrigAngleSinCos(int angle)
 	return pair;
 }
 
-// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8005f89c-0x8005fb4c
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8005f89c-0x8005fb4c.
 void VehPhysForce_RotAxisAngle(MATRIX *m, s16 *normVec, s16 angle)
 {
 	s32 normalX = normVec[0];

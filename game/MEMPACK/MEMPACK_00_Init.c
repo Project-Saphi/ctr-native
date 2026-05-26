@@ -1,56 +1,62 @@
 #include <common.h>
 
-#ifdef REBUILD_PC
+#if defined(CTR_NATIVE)
 // 32mb RAM, so that PrimMem can fill the entirety
 // of 24-bit address space (16mb max) and have enough
 // RAM left over for the rest of the game (16mb more)
 char memory[32 * 1024 * 1024];
 #endif
 
-void RB_EndOfFile();
 void CS_EndOfFile();
-extern char RB_NewEndFile[4];
+void RB_EndOfFile();
+void AH_EndOfFile();
+void MM_EndOfFile();
 void OVR_Region3();
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 PS1 path 0x8003e740-0x8003e80c; CTR_NATIVE uses host RAM.
 void MEMPACK_Init(int ramSize)
 {
+	struct Mempack *ptrMempack;
 	u32 startPtr;
+	u32 maxOverlayEnd;
 	int packSize;
 
-#ifdef REBUILD_PC
+#if defined(CTR_NATIVE)
 
 	// must be a 24-bit address
 	// Visual Studio -> Properties -> Linker -> Advanced ->
 	// Base Address, Randomized Base Address, Fixed Base Address
-	startPtr = &memory[0];
+	startPtr = (u32)&memory[0];
 
 	int boolValid = startPtr < 0x01000000;
 
 	printf("[CTR] Where does memory starts? (%s) %08x\n", boolValid ? "GOOD" : "BAD", startPtr);
 
 	packSize = 32 * 1024 * 1024;
-	memset(startPtr, 0, packSize);
+	memset((void *)startPtr, 0, packSize);
+
+	MEMPACK_NewPack((void *)startPtr, packSize);
 
 #else
 
-	// Defragmentation requires a lower overlay size in bigfile,
-	// which we dont have for 231, so we cheat by setting size
-	// manually in MainMain after call to LOAD_ReadDirectory
+	maxOverlayEnd = (u32)AH_EndOfFile;
+	if (maxOverlayEnd < (u32)RB_EndOfFile)
+		maxOverlayEnd = (u32)RB_EndOfFile;
+	if (maxOverlayEnd < (u32)MM_EndOfFile)
+		maxOverlayEnd = (u32)MM_EndOfFile;
+	if (maxOverlayEnd < (u32)CS_EndOfFile)
+		maxOverlayEnd = (u32)CS_EndOfFile;
 
-	// RB_EndOfFile		800ba548	30 sectors (original game, deprecated by decomp)
-	// Defragged 231	800b8c78	28 sectors
-	// CS_EndOfFile		800b97fc	28 sectors (original game, current largest size)
+	startPtr = (u32)OVR_Region3 + (((maxOverlayEnd - (u32)OVR_Region3) + 0x7ff) & ~0x7ff);
+	packSize = ramSize - (int)(startPtr & 0xffffff) - 0x800;
 
-	u32 Aligned231 = 28 * 0x800;
-	// u32 Size231 = (u32)RB_NewEndFile - (u32)OVR_Region3;
-	// u32 Aligned231 = ((Size231 + 0x7ff) & ~(0x7ff));
-	// printf("\nMEMPACK_Init: %d sectors in 231\n\n", Aligned231/0x800);
-
-	// Original game allocated 0x800 to stack,
-	// but now Stack is relocated to kernel memory
-	startPtr = ((u32)OVR_Region3 + Aligned231);
-	packSize = ramSize - (int)(startPtr & 0xffffff);
+	ptrMempack = sdata->PtrMempack;
+	ptrMempack->start = (void *)startPtr;
+	ptrMempack->endOfAllocator = (void *)(startPtr + packSize);
+	ptrMempack->lastFreeByte = (void *)(startPtr + packSize);
+	ptrMempack->packSize = packSize;
+	ptrMempack->numBookmarks = 0;
+	ptrMempack->endOfMemory = (void *)0x80200000;
+	ptrMempack->firstFreeByte = (void *)startPtr;
 #endif
-
-	MEMPACK_NewPack(startPtr, packSize);
 }

@@ -1,6 +1,6 @@
 #include <common.h>
 
-// NOTE(aalhendi): ASM-verified NTSC-U 926 0x80063b2c-0x80063bd4
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x80063b2c-0x80063bd4.
 void VehPhysProc_SlamWall_Animate(struct Thread *t, struct Driver *d)
 {
 	struct Instance *inst = t->inst;

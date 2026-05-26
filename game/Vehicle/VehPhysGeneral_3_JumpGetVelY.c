@@ -1,6 +1,6 @@
 #include <common.h>
 
-// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800605a0-0x80060630
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800605a0-0x80060630.
 int VehPhysGeneral_JumpGetVelY(s16 *normalVec, Vec3 *speedXYZ)
 {
 	int normalY = normalVec[1];

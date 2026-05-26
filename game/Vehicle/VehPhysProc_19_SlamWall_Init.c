@@ -3,8 +3,6 @@
 void COLL_FIXED_PlayerSearch();
 void VehPhysProc_SlamWall_Animate();
 
-// budget, 0x120 bytes, 288 bytes
-
 void *PlayerCrashingFuncTable[13] = {
     0,
     VehPhysProc_SlamWall_Update,
@@ -12,8 +10,6 @@ void *PlayerCrashingFuncTable[13] = {
     VehPhysProc_Driving_Audio,
     VehPhysProc_SlamWall_PhysAngular,
     VehPhysForce_OnApplyForces,
-
-#ifndef REBUILD_PS1
     COLL_MOVED_PlayerSearch,
     VehPhysForce_CollideDrivers,
     COLL_FIXED_PlayerSearch,
@@ -21,20 +17,6 @@ void *PlayerCrashingFuncTable[13] = {
     VehPhysForce_TranslateMatrix,
     VehPhysProc_SlamWall_Animate,
     VehEmitter_DriverMain,
-#else
-#ifdef CTR_NATIVE
-    COLL_MOVED_PlayerSearch,
-    VehPhysForce_CollideDrivers,
-#else
-    NULL,
-    NULL,
-#endif
-    COLL_FIXED_PlayerSearch,
-    VehPhysGeneral_JumpAndFriction,
-    VehPhysForce_TranslateMatrix,
-    VehPhysProc_SlamWall_Animate,
-    VehEmitter_DriverMain,
-#endif
 };
 
 // NOTE(aalhendi): ASM-verified NTSC-U 926 0x80063bd4-0x80063cf4.
@@ -44,7 +26,7 @@ void VehPhysProc_SlamWall_Init(struct Thread *t, struct Driver *d)
 	struct Instance *inst;
 	inst = d->instSelf;
 
-	// it doesn't set 2? does that change anyway?
+	// NOTE(aalhendi): Retail only writes X/Y scale here.
 	inst->scale[0] = 0xccc;
 	inst->scale[1] = 0xccc;
 

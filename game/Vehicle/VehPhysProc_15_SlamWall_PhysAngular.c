@@ -1,5 +1,6 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x80063a44-0x80063af8.
 void VehPhysProc_SlamWall_PhysAngular(struct Thread *t, struct Driver *d)
 {
 	int elapsedTimeMS = sdata->gGT->elapsedTimeMS;
@@ -13,7 +14,5 @@ void VehPhysProc_SlamWall_PhysAngular(struct Thread *t, struct Driver *d)
 
 	d->turnAngleCurr = VehCalc_InterpBySpeed(d->turnAngleCurr, (elapsedTimeMS << 7) >> 5, 0);
 
-#ifndef REBUILD_PS1
 	VehPhysForce_RotAxisAngle(&d->matrixMovingDir, &d->AxisAngle1_normalVec.x, d->angle);
-#endif
 }

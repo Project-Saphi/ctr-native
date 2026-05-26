@@ -14,7 +14,8 @@ void *LOAD_XnfFile(char *filename, void *ptrDestination, int *size)
 
 	*size = cdlFile.size;
 
-	if (ptrDestination == 0)
+	int allocated = ptrDestination == NULL;
+	if (allocated)
 	{
 		// allocate room for all sectors,
 		// remove alignment before next Read
@@ -22,8 +23,6 @@ void *LOAD_XnfFile(char *filename, void *ptrDestination, int *size)
 		ptrDestination = MEMPACK_AllocMem(sectorSize /*, fileName*/);
 		if (ptrDestination == NULL)
 			return NULL;
-
-		MEMPACK_ReallocMem(cdlFile.size);
 	}
 
 	char buf[8];
@@ -34,6 +33,9 @@ void *LOAD_XnfFile(char *filename, void *ptrDestination, int *size)
 
 	if (CdReadSync(0, 0))
 		return 0;
+
+	if (allocated)
+		MEMPACK_ReallocMem(cdlFile.size);
 
 	return ptrDestination;
 }

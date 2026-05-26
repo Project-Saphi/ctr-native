@@ -1815,6 +1815,8 @@ static struct RenderBucketUncompressResult RenderBucket_UncompressAnimationFrame
 	u8 flags = (command >> 24) & 0xff;
 	RenderBucketVertex nextVertex;
 
+	// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8006b24c-0x8006b4c8.
+	// Native carries retail register state in the explicit draw context.
 	if ((ctx->idpp->ptrNextFrame == 0) || (ctx->nextVertData == 0))
 		return RenderBucket_UncompressAnimationFrame(ctx, command, stackIndex);
 
@@ -1906,7 +1908,7 @@ static struct RenderBucketUncompressResult RenderBucket_UncompressAnimationFrame
 static struct RenderBucketUncompressResult RenderBucket_UncompressAnimationFrame_ReflectNextFrame(struct RenderBucketDrawContext *ctx, u32 command,
                                                                                                   u16 stackIndex)
 {
-	// NOTE(aalhendi): ASM-verified next-frame counterpart to 0x8006bf30:
+	// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8006cdec-0x8006d094:
 	// decode through 0x8006b24c semantics, then apply the split transform.
 	return RenderBucket_TransformSplitDecodedVertex(ctx, command, stackIndex, RenderBucket_UncompressAnimationFrame_NextFrame(ctx, command, stackIndex));
 }

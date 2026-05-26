@@ -1,6 +1,6 @@
 #include <common.h>
 
-// NOTE(aalhendi): ASM-verified NTSC-U 926 0x80064320-0x800643d4
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x80064320-0x800643d4.
 void VehPhysProc_SpinStop_PhysAngular(struct Thread *t, struct Driver *d)
 {
 	int elapsedTimeMS = sdata->gGT->elapsedTimeMS;

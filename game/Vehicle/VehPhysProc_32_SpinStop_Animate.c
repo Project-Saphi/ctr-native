@@ -2,7 +2,7 @@
 
 // only Animate is needed, see StopSpin_Init for details
 
-// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800643d4-0x800644d0
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800643d4-0x800644d0.
 void VehPhysProc_SpinStop_Animate(struct Thread *t, struct Driver *d)
 {
 	struct Instance *inst = t->inst;

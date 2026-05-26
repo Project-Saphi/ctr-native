@@ -1,6 +1,6 @@
 #include <common.h>
 
-// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8005b5fc-0x8005b6b8
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8005b5fc-0x8005b6b8.
 void VehFrameProc_LastSpin(struct Thread *t, struct Driver *d)
 {
 	struct Instance *inst = t->inst;

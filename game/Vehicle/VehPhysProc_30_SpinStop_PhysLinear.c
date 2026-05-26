@@ -1,6 +1,6 @@
 #include <common.h>
 
-// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800642f4-0x80064320
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800642f4-0x80064320.
 void VehPhysProc_SpinStop_PhysLinear(struct Thread *t, struct Driver *d)
 {
 	VehPhysProc_Driving_PhysLinear(t, d);

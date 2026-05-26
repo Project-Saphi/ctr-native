@@ -8,33 +8,15 @@ void *PlayerLastSpinFuncTable[0xD] = {0,
                                       VehPhysProc_Driving_Audio,
                                       VehPhysProc_SpinLast_PhysAngular,
                                       VehPhysForce_OnApplyForces,
-
-#ifndef REBUILD_PS1
                                       COLL_MOVED_PlayerSearch,
                                       VehPhysForce_CollideDrivers,
                                       COLL_FIXED_PlayerSearch,
                                       VehPhysGeneral_JumpAndFriction,
                                       VehPhysForce_TranslateMatrix,
                                       VehFrameProc_LastSpin,
+                                      VehEmitter_DriverMain};
 
-                                      VehEmitter_DriverMain
-
-#else
-#ifdef CTR_NATIVE
-                                      COLL_MOVED_PlayerSearch,
-                                      VehPhysForce_CollideDrivers,
-#else
-                                      NULL,
-                                      NULL,
-#endif
-                                      COLL_FIXED_PlayerSearch,
-                                      VehPhysGeneral_JumpAndFriction,
-                                      VehPhysForce_TranslateMatrix,
-                                      VehFrameProc_LastSpin,
-                                      VehEmitter_DriverMain
-#endif
-};
-
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x80064254-0x800642ec.
 void VehPhysProc_SpinLast_Init(struct Thread *t, struct Driver *d)
 {
 	int i;

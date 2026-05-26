@@ -1,6 +1,6 @@
 #include <common.h>
 
-// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8005b510-0x8005b5fc
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8005b510-0x8005b5fc.
 void VehFrameProc_Spinning(struct Thread *t, struct Driver *d)
 {
 	struct Instance *inst = t->inst;

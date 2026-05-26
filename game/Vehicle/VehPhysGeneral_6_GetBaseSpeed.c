@@ -1,5 +1,6 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x80061488-0x8006163c.
 int VehPhysGeneral_GetBaseSpeed(struct Driver *driver)
 {
 	int netSpeed;
@@ -9,11 +10,7 @@ int VehPhysGeneral_GetBaseSpeed(struct Driver *driver)
 
 	statAdditional = (int)driver->const_Speed_ClassStat;
 
-#if 1
-	netSpeedCap = 6144;
-#else
 	netSpeedCap = (int)driver->const_SacredFireSpeed * 2 - (int)driver->const_SingleTurboSpeed;
-#endif
 
 	netSpeedCap -= (int)driver->fireSpeedCap;
 
@@ -34,18 +31,7 @@ int VehPhysGeneral_GetBaseSpeed(struct Driver *driver)
 		turboMultiplier = 5;
 	}
 
-#if 1
-
-	int netSpeedStat = 0x12bfff;
-
-#else
-
-	// {0, 0x42e, 2, 14640, 15020, 15400, 14450}
-	// {0, 0x42c, 2, 13140, 13520, 13900, 12950}
-	// subtraction = 1500
 	int netSpeedStat = (((driver->const_AccelSpeed_ClassStat - driver->const_Speed_ClassStat) * 0x1000) / 5) - 1;
-
-#endif
 
 	speedAdditional = ((netWumpaFruitCount * netSpeedStat) / 10) + ((turboMultiplier * netSpeedStat) >> 12);
 

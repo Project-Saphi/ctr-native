@@ -771,8 +771,8 @@ void PushBuffer_FadeAllWindows();
 
 // RaceConfig
 
-// RaceConfig_LoadGameOptions()
-// RaceConfig_SaveGameOptions()
+void RaceConfig_LoadGameOptions(void);
+void RaceConfig_SaveGameOptions(void);
 
 // TitleFlag
 
@@ -827,10 +827,10 @@ void RefreshCard_StopMemcardAction(void);
 void RefreshCard_SetScreenText(int screenText);
 void RefreshCard_Unknown2(void);
 void RefreshCard_GetNumGhostsTotal(void);
+void RefreshCard_GameProgressAndOptions(void);
 
 // Load...
 
-// RefreshCard_GameProgressAndOptions()
 void RefreshCard_Entry();
 void SelectProfile_QueueLoadHub_MenuProc(struct RectMenu *menu);
 void SelectProfile_ThTick(struct Thread *t);
@@ -1287,6 +1287,7 @@ void Vector_SpecLightSpin3D(struct Instance *, s16 *, s16 *);
 void Vector_SpecLightNoSpin3D(struct Instance *, s16 *, s16 *);
 void CS_Podium_Prize_Spin(struct Instance *inst, s16 *prize);
 int howl_VolumeGet(int type);
+void howl_VolumeSet(int type, u8 vol);
 void Vector_SpecLightSpin2D(struct Instance *, s16 *, s16 *);
 char *CS_Credits_GetNextString(char *);
 void CS_Credits_DestroyCreditGhost();

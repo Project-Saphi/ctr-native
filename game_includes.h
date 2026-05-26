@@ -179,6 +179,7 @@
 #include "game/GAMEPROG/GAMEPROG_03_NewProfile_OutsideAdv.c"
 #include "game/GAMEPROG/GAMEPROG_04_InitFullMemcard.c"
 #include "game/GAMEPROG/GAMEPROG_05_NewProfile_InsideAdv.c"
+#include "game/GAMEPROG/GAMEPROG_07_SyncGameAndCard.c"
 #include "game/GAMEPROG/GAMEPROG_08_NewGame_OnBoot.c"
 #include "game/GAMEPROG/GAMEPROG_09_GetPtrHighScoreTrack.c"
 
@@ -538,6 +539,9 @@
 #include "game/RECTMENU/RECTMENU_19_Hide.c"
 #include "game/RECTMENU/RECTMENU_20_BoolHidden.c"
 
+#include "game/RaceConfig/RaceConfig_0_LoadGameOptions.c"
+#include "game/RaceConfig/RaceConfig_1_SaveGameOptions.c"
+
 #include "game/RefreshCard/RefreshCard_01_Unknown1.c"
 #include "game/RefreshCard/RefreshCard_02_GetResult.c"
 #include "game/RefreshCard/RefreshCard_02_GhostEncodeByte.c"
@@ -549,6 +553,7 @@
 #include "game/RefreshCard/RefreshCard_10_Entry.c"
 #include "game/RefreshCard/RefreshCard_11_Unknown2.c"
 #include "game/RefreshCard/RefreshCard_12_GetNumGhostsTotal.c"
+#include "game/RefreshCard/RefreshCard_13_GameProgressAndOptions.c"
 
 #include "game/SelectProfile/SelectProfile_00_QueueLoadHub_MenuProc.c"
 #include "game/SelectProfile/SelectProfile_01_ThTick.c"

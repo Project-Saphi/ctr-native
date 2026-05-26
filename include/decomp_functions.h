@@ -89,6 +89,7 @@ int GAMEPROG_CheckGhostsBeaten(int ghostID);
 void GAMEPROG_NewGame_OnBoot(void);
 void GAMEPROG_GetPtrHighScoreTrack(void);
 void GAMEPROG_InitFullMemcard(struct MemcardProfile *mcp);
+void GAMEPROG_SyncGameAndCard(struct GameProgress *memcardProg, struct GameProgress *currentProg);
 
 // ghost
 void GhostReplay_Init1(void);
@@ -383,6 +384,9 @@ u8 MEMCARD_EraseFile(int slotIdx, char *srcString);
 int MEMCARD_HandleEvent(void);
 u8 MEMCARD_Save(int slotIdx, char *name, char *icon, u8 *ptrMemcard, int memcardFileSize, u32 flags);
 
+void RaceConfig_LoadGameOptions(void);
+void RaceConfig_SaveGameOptions(void);
+
 void RefreshCard_Entry(void);
 void RefreshCard_GhostEncodeProfile(u32 slotIndex, u16 characterID, u16 levelID, int time, char *name);
 int RefreshCard_GetResult(int result);
@@ -393,6 +397,7 @@ void RefreshCard_StopMemcardAction(void);
 void RefreshCard_SetScreenText(int screenText);
 void RefreshCard_Unknown2(void);
 void RefreshCard_GetNumGhostsTotal(void);
+void RefreshCard_GameProgressAndOptions(void);
 
 void SelectProfile_MuteCursors(void);
 void SelectProfile_UnMuteCursors(void);

@@ -2247,7 +2247,7 @@ static int RenderBucket_DrawInstPrim_NormalAtOTEntry(struct RenderBucketDrawCont
 
 static int RenderBucket_DrawInstPrim_NormalAtRange(struct RenderBucketDrawContext *ctx, u32 command, struct TextureLayout *tex, int activeRange, int depthMac0)
 {
-	// NOTE(aalhendi): ASM-verified 0x8006ad88-0x8006ae68 body; native passes
+	// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8006ad88-0x8006ae74 body; native passes
 	// the retail scratch/register inputs as explicit context and depth state.
 	return RenderBucket_DrawInstPrim_NormalAtOTEntry(ctx, command, tex, RenderBucket_GetNormalOTEntry(activeRange, depthMac0));
 }
@@ -2356,6 +2356,7 @@ int RenderBucket_DrawInstPrim_Normal(struct RenderBucketDrawContext *ctx, u32 co
 
 static int RenderBucket_DrawInstPrim_SelectRange(struct RenderBucketDrawContext *ctx, u32 command, struct TextureLayout *tex, int depthMac0)
 {
+	// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8006ad6c-0x8006ad88.
 	int activeRange = ((s32)(command << 6) > 0) ? ctx->idpp->unkE4 : ctx->idpp->unkE8;
 
 	return RenderBucket_DrawInstPrim_NormalAtRange(ctx, command, tex, activeRange, depthMac0);
@@ -2398,7 +2399,7 @@ static int RenderBucket_DrawInstPrim_DepthFadeAtRange(struct RenderBucketDrawCon
 	if (otEntry == 0)
 		return 0;
 
-	// NOTE(aalhendi): Source-backs retail 0x8006b968-0x8006bad0. It fades each
+	// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8006b968-0x8006bad0. It fades each
 	// rolling vertex color by SZ1/SZ2/SZ3, skips fully black triangles, then
 	// emits a textured GT3 with the normal 0x09 OT tag length.
 	color0 = RenderBucket_DepthFadeColor((u32)ctx->tempColor[1], MFC2_S(17));

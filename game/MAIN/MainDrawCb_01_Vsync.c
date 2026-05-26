@@ -1,7 +1,7 @@
 #include <common.h>
 
-// NOTE(aalhendi): ASM-verified NTSC-U 926 0x80034aa4-0x80034b48;
-// REBUILD_PC keeps native input/audio/VRAM bridge work.
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x80034aa4-0x80034b48 for the retail body.
+// NOTE(aalhendi): REBUILD_PC keeps native input/audio/VRAM bridge work.
 void MainDrawCb_Vsync()
 {
 	struct GameTracker *gGT;

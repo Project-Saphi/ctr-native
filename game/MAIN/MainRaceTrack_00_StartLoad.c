@@ -1,8 +1,7 @@
 #include <common.h>
 
-// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8003cf7c-0x8003cfc0
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8003cf7c-0x8003cfc0.
 void MainRaceTrack_StartLoad(s16 levelID)
-
 {
 	// clear backup,
 	// keep music,

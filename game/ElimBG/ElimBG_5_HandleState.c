@@ -1,5 +1,6 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x80024974-0x80024c08.
 void ElimBG_HandleState(struct GameTracker *gGT)
 {
 	s16 sVar1;
@@ -10,6 +11,7 @@ void ElimBG_HandleState(struct GameTracker *gGT)
 	POLY_FT4 *p;
 	u32 uVar7;
 	char cVar8;
+	u32 tpage;
 	u32 uVar9;
 	int iVar10;
 	RECT rect1;
@@ -48,9 +50,7 @@ void ElimBG_HandleState(struct GameTracker *gGT)
 		// if this is the first frame of pause
 		if (sdata->pause_state == 1)
 		{
-			// optimization, already know & 0x1000
-			// is removed as prerequisite for ElimBG_Activate
-			gGT->renderFlags = 0x20;
+			gGT->renderFlags = (gGT->renderFlags & 0x1000) | 0x20;
 
 			gGT->hudFlags &= 0xf6;
 
@@ -93,15 +93,15 @@ void ElimBG_HandleState(struct GameTracker *gGT)
 					iVar5 = iVar10 + 3;
 				}
 				uVar7 = (iVar5 >> 2) + 0x200;
-				iVar5 = (int)(uVar7 & 0x3ff) >> 6;
+				tpage = ((uVar9 & 0x100) >> 4) | ((uVar7 & 0x3ff) >> 6) | ((uVar9 & 0x200) << 2);
 
 				// tpage
-				p->tpage = (u16)iVar5;
+				p->tpage = (u16)tpage;
 
 				// clut
 				p->clut = 0x3fe0;
 
-				iVar6 = (uVar7 + iVar5 * -0x40) * 4;
+				iVar6 = (uVar7 - ((tpage << 6) & 0x3c0)) * 4;
 
 				p->v0 = uVar9;
 				p->v1 = uVar9;
@@ -122,7 +122,7 @@ void ElimBG_HandleState(struct GameTracker *gGT)
 				}
 
 				// u2
-				iVar5 = (uVar7 + iVar5 * -0x40) * 4;
+				iVar5 = (uVar7 - ((tpage << 6) & 0x3c0)) * 4;
 
 				// u2
 				cVar4 = (char)iVar5;

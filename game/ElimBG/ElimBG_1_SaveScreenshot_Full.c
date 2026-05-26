@@ -1,5 +1,6 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8002459c-0x8002481c.
 void ElimBG_SaveScreenshot_Full(struct GameTracker *gGT)
 {
 	int iVar4;

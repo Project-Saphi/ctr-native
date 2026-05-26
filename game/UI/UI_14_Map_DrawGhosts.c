@@ -1,5 +1,6 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8004dee8-0x8004dffc.
 void UI_Map_DrawGhosts(int ptrMap, struct Thread *bucket)
 {
 	int color;

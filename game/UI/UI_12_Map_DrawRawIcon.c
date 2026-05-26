@@ -1,5 +1,6 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8004dc44-0x8004dd5c.
 // Draw icon on map
 void UI_Map_DrawRawIcon(int ptrMap, int *param_2, int iconID, int colorID, int unused, s16 scale)
 {
@@ -7,6 +8,8 @@ void UI_Map_DrawRawIcon(int ptrMap, int *param_2, int iconID, int colorID, int u
 	int posY;
 	int *ptrColor;
 	struct GameTracker *gGT = sdata->gGT;
+
+	(void)unused;
 
 	posX = param_2[0];
 	posY = param_2[2];

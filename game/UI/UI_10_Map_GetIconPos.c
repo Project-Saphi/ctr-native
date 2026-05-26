@@ -1,7 +1,5 @@
 #include <common.h>
 
-// 488 / 760
-
 // move to headers later
 struct Map
 {
@@ -18,6 +16,7 @@ struct Map
 	s16 mode;
 };
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8004d8b4-0x8004dbac.
 void UI_Map_GetIconPos(s16 *m, int *posX, int *posY)
 
 {

@@ -1,5 +1,6 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8003d540-0x8003d584.
 u32 MEMCARD_CRC16(u32 crc, int nextByte)
 {
 	int i;

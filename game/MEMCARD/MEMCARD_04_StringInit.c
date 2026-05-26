@@ -1,19 +1,18 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8003d6e8-0x8003d730.
 char *MEMCARD_StringInit(int slotIndex, char *dstString)
 {
 	if (!dstString)
 	{
-		// if no string is provided, use global string
 		dstString = &sdata->s_memcardDirHeader[0];
 	}
 
-	*(int *)&dstString[0] = 0x30307562; // bu00
-	dstString[3] = '0' + slotIndex;     // bu0X where X = slotIndex
-
-	// ':' and null terminator
-	*(s16 *)&dstString[4] = ':';
-
-	// result is: "bu00:\0"
+	dstString[0] = 'b';
+	dstString[1] = 'u';
+	dstString[2] = '0' + ((slotIndex >> 4) & 1);
+	dstString[3] = '0' + (slotIndex & 3);
+	dstString[4] = ':';
+	dstString[5] = '\0';
 	return dstString;
 }

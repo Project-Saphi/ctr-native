@@ -1228,10 +1228,13 @@ static int DrawLevelOvr1P_ShouldSetSemiTransFromTpage(u16 tpage)
 	return (tpage & 0x60) != 0x60;
 }
 
-static void DrawLevelOvr1P_AddRawPrimToOt(u32 *primWords, u32 wordCount, u_long *otEntry)
+static void DrawLevelOvr1P_AddRawPrimToOt(struct PrimMem *primMem, u32 *primWords, u32 wordCount, u_long *otEntry)
 {
 	primWords[0] = ((u32)*otEntry & 0x00ffffff) | (wordCount << 24);
 	*otEntry = (u32)(uintptr_t)primWords & 0x00ffffff;
+	// NOTE(aalhendi): Retail keeps the overlay primitive count in `sp`, seeded
+	// from PrimMem+0x14 and stored back at the epilogue.
+	primMem->unk1++;
 }
 
 static u32 DrawLevelOvr1P_GetProjectedColorCode(const struct DrawLevelOvr1PScratchVertex *projected, u32 code)
@@ -1284,7 +1287,7 @@ static int DrawLevelOvr1P_EmitPreparedProjectedQuadRawAtOt(struct PushBuffer *pb
 	prim[10] = DrawLevelOvr1P_GetProjectedColorCode(&projected[indices[3]], 0);
 	prim[11] = DrawLevelOvr1P_PackProjectedSxy(&projected[indices[3]]);
 	prim[12] = uv2 >> 16;
-	DrawLevelOvr1P_AddRawPrimToOt(prim, 12, &pb->ptrOT[otIndex]);
+	DrawLevelOvr1P_AddRawPrimToOt(primMem, prim, 12, &pb->ptrOT[otIndex]);
 	primMem->curr = nextPrim;
 	return 1;
 }
@@ -1329,7 +1332,7 @@ static int DrawLevelOvr1P_EmitPreparedProjectedTriRawAtOt(struct PushBuffer *pb,
 	prim[7] = DrawLevelOvr1P_GetProjectedColorCode(&projected[indices[2]], 0);
 	prim[8] = DrawLevelOvr1P_PackProjectedSxy(&projected[indices[2]]);
 	prim[9] = uv2;
-	DrawLevelOvr1P_AddRawPrimToOt(prim, 9, &pb->ptrOT[otIndex]);
+	DrawLevelOvr1P_AddRawPrimToOt(primMem, prim, 9, &pb->ptrOT[otIndex]);
 	primMem->curr = nextPrim;
 	return 1;
 }
@@ -1823,7 +1826,7 @@ static int DrawLevelOvr1P_EmitClipRecordQuad(struct PushBuffer *pb, struct PrimM
 	prim[10] = DrawLevelOvr1P_GetClipRecordColorCode(&emit[3], 0);
 	prim[11] = DrawLevelOvr1P_PackProjectedSxy(&emit[3]);
 	prim[12] = DrawLevelOvr1P_GetClipRecordSignedUvWord(&emit[3]);
-	DrawLevelOvr1P_AddRawPrimToOt(prim, 12, otEntry);
+	DrawLevelOvr1P_AddRawPrimToOt(primMem, prim, 12, otEntry);
 	primMem->curr = nextPrim;
 	return 1;
 }
@@ -1867,7 +1870,7 @@ static int DrawLevelOvr1P_EmitClipRecordTri(struct PushBuffer *pb, struct PrimMe
 	prim[7] = DrawLevelOvr1P_GetClipRecordColorCode(&emit[2], 0);
 	prim[8] = DrawLevelOvr1P_PackProjectedSxy(&emit[2]);
 	prim[9] = uv2;
-	DrawLevelOvr1P_AddRawPrimToOt(prim, 9, otEntry);
+	DrawLevelOvr1P_AddRawPrimToOt(primMem, prim, 9, otEntry);
 	primMem->curr = nextPrim;
 	return 1;
 }
@@ -3416,6 +3419,7 @@ static int DrawLevelOvr1P_EmitProjectedGroundQuad(struct PushBuffer *pb, struct 
 		setSemiTrans(prim, true);
 
 	AddPrim(&pb->ptrOT[otIndex], primCurr);
+	primMem->unk1++;
 	primMem->curr = nextPrim;
 	return 1;
 }

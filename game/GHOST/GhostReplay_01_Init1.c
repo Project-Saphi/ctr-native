@@ -1,14 +1,14 @@
 #include <common.h>
 
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x80027838-0x80027b88.
 void GhostReplay_Init1(void)
 {
-	char i;
-	u16 uVar1;
-	int iVar2;
+	int i;
 	struct Thread *t;
 	struct Instance *inst;
 	struct Instance *wakeInst;
 	struct Driver *ghostDriver;
+	struct Model *model;
 	struct Model *wake;
 	int timeTrialFlags;
 
@@ -16,9 +16,6 @@ void GhostReplay_Init1(void)
 	struct GhostTape *tape;
 	int charID;
 	char *recordBuffer;
-
-	// for human reading purposes
-	u8 playerID;
 
 	struct GameTracker *gGT = sdata->gGT;
 
@@ -47,10 +44,6 @@ void GhostReplay_Init1(void)
 	// ALWAYS initialize ghost threads
 	// even if gh == 0, or else the text
 	// for "Ghost Too Big" will never play
-	gh = 0;
-	charID = 0;
-	playerID = charID;
-
 	for (i = 0; i < 2; i++)
 	{
 		tape = MEMPACK_AllocMem(0x268 /*, "ghost tape"*/);
@@ -59,19 +52,8 @@ void GhostReplay_Init1(void)
 		// first ghost pointer is a ghost loaded by player
 		if (i == 0)
 		{
-			// if ghost is playing, initialize ghost
-			if (sdata->boolReplayHumanGhost != 0)
-			{
-				// assign the ghost you loaded
-				gh = sdata->ptrGhostTapePlaying;
-
-				playerID = 1;
-			}
-
-			// if no human ghost is replayed, do NOT
-			// "return", the ghost[0] thread must be
-			// initialized, or else the "Ghost Too Big"
-			// text will not play from GhostReplay_ThTick
+			// assign the ghost you loaded
+			gh = sdata->ptrGhostTapePlaying;
 		}
 
 		// second ghost pointer is n tropy or oxide
@@ -86,53 +68,23 @@ void GhostReplay_Init1(void)
 
 			void **pointers = ST1_GETPOINTERS(gGT->level1->ptrSpawnType1);
 
-#ifdef REBUILD_PC
-			timeTrialFlags = 7;
-#endif
-
-			switch (timeTrialFlags)
+			if ((timeTrialFlags & 2) != 0)
 			{
-			// no ghost
-			case 0:
-				return;
-
-			// ntropy
-			case 1:
-				gh = pointers[ST1_NTROPY];
-				playerID = 2;
-				break;
-
-			// oxide
-			default:
 				gh = pointers[ST1_NOXIDE];
-				playerID = 3;
-				break;
+			}
+			else
+			{
+				gh = pointers[ST1_NTROPY];
 			}
 		}
 
-		sdata->boolGhostsDrawing = 1;
 		recordBuffer = GHOSTHEADER_GETRECORDBUFFER(gh);
-
-		// Signals GhostReplay_ThTick to return
-		// early, and not try to "play" the ghost
-		tape->ptrStart = 0;
-		tape->ptrEnd = 0;
-
-		if (gh != 0)
-		{
-			tape->ptrStart = &recordBuffer[0];
-			tape->ptrEnd = &recordBuffer[gh->size];
-		}
 
 		tape->gh = gh;
 		tape->gh_again = gh;
+		tape->ptrStart = &recordBuffer[0];
 		tape->constDEADC0ED = 0xDEADC0ED;
-		tape->ptrCurr = tape->ptrStart;
-		tape->timeElapsedInRace = 0;
-		tape->timeInPacket32_backup = 0;
-		tape->unk20 = 0;
-		tape->timeInPacket01 = 0;
-		tape->timeInPacket32 = 0;
+		tape->ptrEnd = &recordBuffer[gh->size];
 
 		// if n tropy / oxide
 		if (i == 1)
@@ -140,33 +92,19 @@ void GhostReplay_Init1(void)
 			// guaranteed gh != 0, so dont nullptr check
 			gGT->timeToBeatInTimeTrial_ForCurrentEvent = gh->timeElapsedInRace;
 		}
+	}
 
-		// characterID and model
-		charID = data.characterIDs[playerID];
-
-// set in MainInit_Drivers for PC port
-#ifndef REBUILD_PS1
-		struct Model *model = VehBirth_GetModelByName(data.MetaDataCharacters[charID].name_Debug);
-#else
-		struct Model *model = NULL;
-#endif
-
-		inst = INSTANCE_Birth3D(model, NULL, NULL);
-		inst->unk51 = 0xc;
-		inst->flags = 7;
-
+	for (i = 0; i < 2; i++)
+	{
 		t = PROC_BirthWithObject(
 
 		    // creation flags
 		    SIZE_RELATIVE_POOL_BUCKET(4, NONE, LARGE, GHOST),
 
-		    GhostReplay_ThTick, 0, 0);
+		    GhostReplay_ThTick, sdata->s_ghost, 0);
 
 		t->modelIndex = DYNAMIC_GHOST; // ghost
 		t->flags |= 0x1000;            // ignore collisions
-
-		t->inst = inst;
-		inst->thread = t;
 
 		// ghost drivers are 0x638 bytes large
 		ghostDriver = t->object;
@@ -174,10 +112,14 @@ void GhostReplay_Init1(void)
 		ghostDriver->ghostID = i;
 		ghostDriver->driverID = i + 1;
 		ghostDriver->ghostBoolInit = 0;
-		ghostDriver->ghostBoolStarted = 0;
-		ghostDriver->ghostTape = tape;
-		ghostDriver->instSelf = inst;
-		ghostDriver->actionsFlagSet |= 0x100000; // AI driver
+		ghostDriver->ghostTape = sdata->ptrGhostTape[i];
+
+		// characterID and model
+		charID = data.characterIDs[i + 1];
+		model = VehBirth_GetModelByName(data.MetaDataCharacters[charID].name_Debug);
+
+		inst = INSTANCE_Birth3D(model, model->name, t);
+		t->inst = inst;
 
 		// Ptr Model "Wake"
 		wake = gGT->modelPtr[STATIC_WAKE];
@@ -185,7 +127,7 @@ void GhostReplay_Init1(void)
 		// if "Wake" model exists
 		if (wake)
 		{
-			wakeInst = INSTANCE_Birth3D(wake, 0, 0);
+			wakeInst = INSTANCE_Birth3D(wake, wake->name, 0);
 			ghostDriver->wakeInst = wakeInst;
 
 			if (wakeInst != 0)
@@ -195,11 +137,13 @@ void GhostReplay_Init1(void)
 			}
 		}
 
+		inst->unk51 = 0xc;
+		inst->flags |= 0x4000000;
+		ghostDriver->instSelf = inst;
 		VehBirth_TireSprites(t);
 		VehBirth_SetConsts(ghostDriver);
 
-		if (charID == NITROS_OXIDE)
-			ghostDriver->wheelSize = 0;
+		ghostDriver->actionsFlagSet |= 0x100000; // AI driver
 
 		// pointer to TrTire, for transparent tires
 		ghostDriver->wheelSprites = ICONGROUP_GETICONS(gGT->iconGroup[0xc]);

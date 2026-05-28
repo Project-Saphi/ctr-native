@@ -6,6 +6,8 @@ void MainFrame_InitVideoSTR(u32 boolPlayVideoStr, RECT *r, s16 posX, s16 posY)
 #ifdef CTR_NATIVE
 	if (r == NULL)
 	{
+		// NOTE(aalhendi): Native overlay 230 uses NULL to disable STR copy;
+		// retail blindly copies the RECT fields in the PSX path below.
 		sdata->videoSTR_src_vramRect.x = 0;
 		sdata->videoSTR_src_vramRect.y = 0;
 		sdata->videoSTR_src_vramRect.w = 0;

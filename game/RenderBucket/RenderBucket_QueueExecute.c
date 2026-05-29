@@ -3506,7 +3506,6 @@ void RenderBucket_DrawFunc_Normal(struct RenderBucketDrawContext *ctx)
 	// RenderBucket draw function. It has the named retail boundary, but the
 	// exact branch/register choreography remains a pending ASM audit.
 	pCmd = (u32 *)ctx->idpp->ptrCommandList;
-	RenderBucket_CopyScratchColorCache(ctx);
 	pCmd++;
 
 	while (*pCmd != 0xffffffff)
@@ -3770,7 +3769,6 @@ static void RenderBucket_DrawFunc_Special(struct RenderBucketDrawContext *ctx)
 	// NOTE(aalhendi): Source-backs the visible two-pass shape of the retail
 	// 0x8006bbc0 special split handler. The exact RTPS FIFO/scratchpad
 	// continuation choreography is still pending a direct ASM pass.
-	RenderBucket_CopyScratchColorCache(ctx);
 	pCmd++;
 
 	while (*pCmd != 0xffffffff)
@@ -3861,7 +3859,6 @@ static void RenderBucket_DrawFunc_Reflection(struct RenderBucketDrawContext *ctx
 	// NOTE(aalhendi): Source-backs retail 0x8006c9c4's reflected split draw
 	// shape. The exact scratchpad/FIFO instruction choreography is still pending
 	// a direct ASM pass.
-	RenderBucket_CopyScratchColorCache(ctx);
 	pCmd++;
 
 	while (*pCmd != 0xffffffff)
@@ -3956,7 +3953,6 @@ static void RenderBucket_DrawFunc_Split(struct RenderBucketDrawContext *ctx)
 
 	// NOTE(aalhendi): ASM-verified against NTSC-U 926 0x8006b030-0x8006b24c.
 	// The called water split helper at 0x8006d094 is audited separately.
-	RenderBucket_CopyScratchColorCache(ctx);
 	pCmd++;
 
 	while (*pCmd != 0xffffffff)
@@ -4058,12 +4054,6 @@ static void RenderBucket_DrawFunc_NormalAlt(struct RenderBucketDrawContext *ctx)
 {
 	u32 *pCmd = (u32 *)ctx->idpp->ptrCommandList;
 
-	// NOTE(aalhendi): Source-backs the 0x8006a6b8 alternate normal entry's
-	// split plane setup. Retail stores the full `H * 2 - TRZ` word at
-	// scratchpad 0xdc/0xf4 for generated vertex Z, and separately consumes its
-	// low halfword from scratchpad 0x44 for split-distance tests.
-	ctx->splitPlane = ((s32)CFC2(26) << 1) - (s32)CFC2(7);
-	RenderBucket_CopyScratchColorCache(ctx);
 	pCmd++;
 
 	while (*pCmd != 0xffffffff)
@@ -4235,6 +4225,10 @@ static int RenderBucket_RunInstanceSetupCallback(struct RenderBucketDrawContext 
 
 static void RenderBucket_DispatchDrawFunc(struct RenderBucketDrawContext *ctx)
 {
+	// NOTE(aalhendi): Retail RenderBucket_Execute copies the per-model color
+	// cache to scratchpad 0x140 before Instance+0x5c setup callback dispatch.
+	RenderBucket_CopyScratchColorCache(ctx);
+
 	if (RenderBucket_RunInstanceSetupCallback(ctx) == 0)
 		return;
 
@@ -4280,6 +4274,7 @@ static int RenderBucket_PrepareDrawContext(struct RenderBucketDrawContext *ctx, 
 	struct PushBuffer *pb;
 	struct ModelHeader *mh;
 	struct ModelFrame *mf;
+	struct ModelFrame *nextFrame;
 	struct ModelAnim *anim;
 
 	if (inst == 0)
@@ -4309,15 +4304,49 @@ static int RenderBucket_PrepareDrawContext(struct RenderBucketDrawContext *ctx, 
 	mf = idpp->ptrCurrFrame;
 	if (mf == 0)
 		return 0;
+	nextFrame = idpp->ptrNextFrame;
 
 	anim = RenderBucket_GetAnim(inst, mh);
+
+	*CTR_SCRATCHPAD_PTR(u32, 0xc) = (u32)(uintptr_t)primMem;
+	*CTR_SCRATCHPAD_PTR(u32, 0x10) = (u32)(uintptr_t)inst;
+	*CTR_SCRATCHPAD_PTR(u32, 0x8) = (u32)(uintptr_t)pb;
+	*CTR_SCRATCHPAD_PTR(s16, 0x1c) = pb->rect.w;
+	*CTR_SCRATCHPAD_PTR(s16, 0x1e) = pb->rect.h;
+	if (nextFrame != 0)
+	{
+		*CTR_SCRATCHPAD_PTR(s16, 0x30) = mf->pos[0] + nextFrame->pos[0];
+		*CTR_SCRATCHPAD_PTR(s16, 0x32) = mf->pos[1] + nextFrame->pos[1];
+		*CTR_SCRATCHPAD_PTR(u32, 0x34) = (u32)((s32)(mf->pos[2] + nextFrame->pos[2]) << 1);
+	}
+	else
+	{
+		*CTR_SCRATCHPAD_PTR(s16, 0x30) = mf->pos[0] & 0x7fff;
+		*CTR_SCRATCHPAD_PTR(s16, 0x32) = mf->pos[1];
+		*CTR_SCRATCHPAD_PTR(u32, 0x34) = (s32)mf->pos[2];
+	}
 
 	gte_SetRotMatrix(&idpp->mvp);
 	gte_SetTransMatrix(&idpp->mvp);
 	gte_SetGeomOffset(pb->rect.w >> 1, pb->rect.h >> 1);
 	gte_SetGeomScreen(pb->distanceToScreen_PREV);
+	*CTR_SCRATCHPAD_PTR(u32, 0x24) = idpp->instFlags;
+	*CTR_SCRATCHPAD_PTR(s16, 0x120) = idpp->alphaScale;
 	if ((idpp->instFlags & RB_INSTANCE_SPLIT_STATE_MASK) != 0)
+	{
 		RenderBucket_GteLoadLightMatrixWords(&idpp->m3x3);
+		// NOTE(aalhendi): Retail Execute owns these split scratch words before
+		// callback dispatch.
+		*CTR_SCRATCHPAD_PTR(s16, 0x44) = idpp->splitLine;
+		*CTR_SCRATCHPAD_PTR(s16, 0xda) = idpp->splitLine;
+		*CTR_SCRATCHPAD_PTR(s16, 0xf2) = idpp->splitLine;
+		*CTR_SCRATCHPAD_PTR(u8, 0x48) = (u8)inst->unk53;
+		*CTR_SCRATCHPAD_PTR(u32, 0x4c) = (u32)(uintptr_t)inst->funcPtr[3];
+		*CTR_SCRATCHPAD_PTR(u32, 0x11c) = ((u32)(s32)idpp->splitLine) << 17;
+		*CTR_SCRATCHPAD_PTR(u32, 0xe0) = 0;
+		*CTR_SCRATCHPAD_PTR(u32, 0xf8) = 0;
+		ctx->splitPlane = ((s32)CFC2(26) << 1) - (s32)CFC2(7);
+	}
 
 	ctx->inst = inst;
 	ctx->idpp = idpp;
@@ -4328,8 +4357,8 @@ static int RenderBucket_PrepareDrawContext(struct RenderBucketDrawContext *ctx, 
 	ctx->anim = anim;
 	ctx->vertData = MODELFRAME_GETVERT(mf);
 	ctx->waterSplitSide = -1;
-	if (idpp->ptrNextFrame != 0)
-		ctx->nextVertData = (char *)idpp->ptrNextFrame + mf->vertexOffset;
+	if (nextFrame != 0)
+		ctx->nextVertData = (char *)nextFrame + mf->vertexOffset;
 	return 1;
 }
 
@@ -4343,6 +4372,8 @@ void RenderBucket_Execute(void *param_1, struct PrimMem *param_2)
 	for (; entry->inst != 0; entry++)
 	{
 		struct RenderBucketDrawContext ctx = {0};
+
+		*CTR_SCRATCHPAD_PTR(u32, 0x4) = (u32)(uintptr_t)(entry + 1);
 
 		if (RenderBucket_PrepareDrawContext(&ctx, entry->inst, entry->instPlayerBase, param_2) == 0)
 			continue;

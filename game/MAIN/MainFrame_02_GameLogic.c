@@ -139,7 +139,7 @@ void MainFrame_GameLogic(struct GameTracker *gGT, struct GamepadSystem *gGamepad
 		psVar8 = 0;
 		psVar9 = 0;
 
-#ifndef REBUILD_PS1
+#if !defined(REBUILD_PS1) || defined(CTR_NATIVE)
 		for (psVar12 = gGT->threadBuckets[0].thread; psVar12 != 0; psVar12 = psVar12->siblingThread)
 		{
 			psVar9 = (struct Driver *)psVar12->object;
@@ -170,7 +170,8 @@ void MainFrame_GameLogic(struct GameTracker *gGT, struct GamepadSystem *gGamepad
 
 		for (iVar4 = 0; iVar4 < NUM_BUCKETS; iVar4++)
 		{
-			if (
+			if ((((gGT->gameMode1 & DEBUG_MENU) == 0) || ((gGT->threadBuckets[iVar4].boolCantPause & 1) != 0)) &&
+
 			    // if threads exist
 			    (gGT->threadBuckets[iVar4].thread != 0))
 			{
@@ -209,7 +210,7 @@ void MainFrame_GameLogic(struct GameTracker *gGT, struct GamepadSystem *gGamepad
 			}
 		}
 
-#ifndef REBUILD_PS1
+#if !defined(REBUILD_PS1) || defined(CTR_NATIVE)
 		BOTS_UpdateGlobals();
 #endif
 		GhostTape_WriteMoves(0);
@@ -234,7 +235,7 @@ void MainFrame_GameLogic(struct GameTracker *gGT, struct GamepadSystem *gGamepad
 	uVar5 = LOAD_IsOpen_RacingOrBattle();
 	if (uVar5 != 0)
 	{
-#ifndef REBUILD_PS1
+#if !defined(REBUILD_PS1) || defined(CTR_NATIVE)
 		if ((gGT->gameMode1 & PAUSE_ALL) == 0)
 		{
 			RB_Bubbles_RoosTubes();
@@ -297,17 +298,15 @@ void MainFrame_GameLogic(struct GameTracker *gGT, struct GamepadSystem *gGamepad
 							{
 								if ((((uVar5 != 0) &&
 								      ((
-#ifndef REBUILD_PS1
+#if !defined(REBUILD_PS1) || defined(CTR_NATIVE)
 								          uVar3 = MainFrame_HaveAllPads((u16)(u8)gGT->numPlyrNextGame), (uVar3 & 0xffff) == 0 &&
 #endif
 								                                                                            ((gGT->gameMode1 & PAUSE_ALL) == 0)))) ||
 								     ((gGamepads->gamepad[iVar4].buttonsTapped & BTN_START) != 0)) &&
 								    (gGT->overlayIndex_Threads != -1))
 								{
-#if 0
-						// But why? ND typo?
-						gGT->gameModeEnd = (gGT->gameMode1 & 0x3e0020) | PAUSE_1;
-#endif
+									// NOTE(aalhendi): Retail writes this before freezing the game for pause.
+									gGT->gameModeEnd = (gGT->gameMode1 & 0x3e0020) | PAUSE_1;
 
 									MainFreeze_IfPressStart();
 
@@ -349,7 +348,7 @@ void MainFrame_GameLogic(struct GameTracker *gGT, struct GamepadSystem *gGamepad
 				}
 
 
-#ifndef REBUILD_PS1
+#if !defined(REBUILD_PS1) || defined(CTR_NATIVE)
 
 				// if SAVE
 				if (sVar2 == 1)
@@ -377,7 +376,7 @@ void MainFrame_GameLogic(struct GameTracker *gGT, struct GamepadSystem *gGamepad
 	{
 		if (gGT->timerEndOfRaceVS < 0x96)
 		{
-#ifndef REBUILD_PS1
+#if !defined(REBUILD_PS1) || defined(CTR_NATIVE)
 			UI_VsQuipDrawAll();
 			UI_VsWaitForPressX();
 #endif

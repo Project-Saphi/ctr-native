@@ -53,6 +53,7 @@
 #include "game/BOTS/BOTS_01_InitNavPath.c"
 #include "game/BOTS/BOTS_02_EmptyFunc.c"
 #include "game/BOTS/BOTS_04_Adv_AdjustDifficulty.c"
+#include "game/BOTS/BOTS_05_UpdateGlobals.c"
 #include "game/BOTS/BOTS_06_SetRotation.c"
 #include "game/BOTS/BOTS_07_LevInstColl.c"
 #include "game/BOTS/BOTS_08_ThTick_RevEngine.c"

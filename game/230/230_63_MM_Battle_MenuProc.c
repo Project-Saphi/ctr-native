@@ -121,10 +121,6 @@ void MM_Battle_MenuProc(struct RectMenu *unused)
 		}
 	}
 
-// optimization, dont do this here, it's duplicated in the OG game
-// in MainStats_RestartRaceCountLoss, which happens at the start of
-// battle, not just when you restart a race
-#if 0
 	// Reset team points
 	for (int i = 0; i < 4; i++)
 	{
@@ -133,7 +129,6 @@ void MM_Battle_MenuProc(struct RectMenu *unused)
 		else
 			gGT->battleSetup.pointsPerTeam[i] = 0;
 	}
-#endif
 
 	// Related to Battle mode
 	if ((

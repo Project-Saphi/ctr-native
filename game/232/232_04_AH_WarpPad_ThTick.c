@@ -283,6 +283,226 @@ void AH_WarpPad_ThTick(struct Thread *t)
 
 	// === Assume Unlocked ===
 
+	if ((dist > 0x8fff) && (warppadObj->boolEnteredWarppad == 0))
+		goto WarpPad_AnimateOpen;
+
+	// Retail repeats this setup every close/warping frame before the
+	// transition/load gate.
+	LOAD_Robots1P(data.characterIDs[0]);
+
+	// variable reuse, get track speed champion
+	champID = data.metaDataLEV[levelID].characterID_Champion;
+
+	// default
+	champSlot = 0;
+
+	// If Speed Champion is on the track (Crash-Pura)
+	// and is not the same characterID as Player 1
+	if ((champID < 8) && (champID != data.characterIDs[0]))
+	{
+		// set everyone to spawn in order
+		for (i = 1; i < 8; i++)
+		{
+			if (champID == data.characterIDs[i])
+			{
+				sdata->kartSpawnOrderArray[i] = 0;
+				champSlot = i;
+			}
+
+			else if (i == 7)
+			{
+				sdata->kartSpawnOrderArray[7] = champSlot;
+			}
+
+			else
+			{
+				sdata->kartSpawnOrderArray[i] = i;
+			}
+		}
+	}
+
+	// Speed Champion is invalid
+	else
+	{
+		for (i = 1; i < 8; i++)
+			randKartSpawn[i] = i;
+
+		for (i = 0; i < 7; i++)
+		{
+			rng1 = RngDeadCoed(&sdata->const_0x30215400);
+
+			rng2 = 7 - i;
+
+			rng2 = (rng1 & 0xfff) % rng2 + 1;
+			rng2 = (s16)rng2;
+
+			sdata->kartSpawnOrderArray[randKartSpawn[rng2]] = (char)i;
+
+			while (rng2 < 7)
+			{
+				randKartSpawn[rng2] = randKartSpawn[rng2 + 1];
+				rng2++;
+			}
+		}
+	}
+
+	// spawn P1 in the back
+	sdata->kartSpawnOrderArray[0] = 7;
+
+	// if flag is on-screen, loading has already been finalized
+	if (RaceFlag_IsTransitioning() != 0)
+		goto WarpPad_AnimateOpen;
+
+	levelID = warppadObj->levelID;
+
+	// gem cups
+	if (levelID >= AH_WP_ADV_CUP)
+	{
+		warppadObj->boolEnteredWarppad = 1;
+		warppadObj->framesWarping++;
+		gGT->drivers[0]->funcPtrs[0] = VehStuckProc_Warp_Init;
+		if (warppadObj->framesWarping < 61)
+			goto WarpPad_AnimateOpen;
+
+		sdata->Loading.OnBegin.AddBitsConfig0 |= ADVENTURE_CUP;
+
+		gGT->cup.cupID = levelID - AH_WP_ADV_CUP;
+		gGT->cup.trackIndex = 0;
+		for (i = 0; i < 8; i++)
+			gGT->cup.points[i] = 0;
+
+		levelID = data.advCupTrackIDs[4 * gGT->cup.cupID];
+		goto WarpPad_RequestLoad;
+	}
+
+	// Slide Col or Turbo Track
+	if (((u16)(levelID - AH_WP_SLIDE_COLISEUM)) < 2)
+	{
+		warppadObj->boolEnteredWarppad = 1;
+		warppadObj->framesWarping++;
+		gGT->drivers[0]->funcPtrs[0] = VehStuckProc_Warp_Init;
+		if (warppadObj->framesWarping < 61)
+			goto WarpPad_AnimateOpen;
+
+		sdata->Loading.OnBegin.AddBitsConfig0 |= RELIC_RACE;
+		goto WarpPad_RequestLoad;
+	}
+
+	// Battle Tracks
+	if ((((u16)(levelID - AH_WP_NITRO_COURT)) < 2) || (levelID == 21) || (levelID == 23))
+	{
+		warppadObj->boolEnteredWarppad = 1;
+		warppadObj->framesWarping++;
+		gGT->drivers[0]->funcPtrs[0] = VehStuckProc_Warp_Init;
+		if (warppadObj->framesWarping < 61)
+			goto WarpPad_AnimateOpen;
+
+		sdata->Loading.OnBegin.AddBitsConfig0 |= CRYSTAL_CHALLENGE;
+
+		// Dont have hint "collect every crystal"
+		if ((sdata->advProgress.rewards[4] & 0x8000) == 0)
+			MainFrame_RequestMaskHint(0x19, 1);
+
+		// if can't spawn aku cause he's already here,
+		// quit function, wait till he's done to start race
+		i = AH_MaskHint_boolCanSpawn();
+		if ((i & 0xffff) == 0)
+			goto WarpPad_AnimateOpen;
+
+		gGT->originalEventTime = D232.timeCrystalChallenge[levelID - AH_WP_NITRO_COURT];
+		goto WarpPad_RequestLoad;
+	}
+
+	if (levelID < AH_WP_SLIDE_COLISEUM)
+	{
+		if (CHECK_ADV_BIT(sdata->advProgress.rewards, (levelID + 6)) != 0)
+		{
+			if (gGT->currAdvProfile.numTrophies >= data.metaDataLEV[levelID].numTrophiesToOpen)
+			{
+				if (warppadObj->framesWarping < 61)
+					goto WarpPad_TrophyAnimateOnly;
+
+				// if never opened
+				if (sdata->boolOpenTokenRelicMenu == 0)
+				{
+					if ((gGT->gameMode1 & ADVENTURE_ARENA) != 0)
+					{
+						D232.menuTokenRelic.rowSelected = (CHECK_ADV_BIT(sdata->advProgress.rewards, (levelID + 0x4c)) != 0);
+
+						RECTMENU_Show(&D232.menuTokenRelic);
+
+						// now opened
+						sdata->boolOpenTokenRelicMenu = 1;
+					}
+				}
+
+				// if opened, but not closed yet
+				if ((RECTMENU_BoolHidden(&D232.menuTokenRelic) & 0xffff) == 0)
+					goto WarpPad_TrophyAnimateOnly;
+
+				// Relic Hint
+				i = 0x1d;
+
+				// CTR Token Hint
+				if ((gGT->gameMode2 & 8) != 0)
+					i = 0x1a;
+
+				// if hint is locked
+				if (CHECK_ADV_BIT(sdata->advProgress.rewards, (i + 0x76)) == 0)
+					MainFrame_RequestMaskHint(i, 1);
+
+				// if can't spawn aku cause he's already here,
+				// quit function, wait till he's done to start race
+				i = AH_MaskHint_boolCanSpawn();
+				if ((i & 0xffff) == 0)
+					goto WarpPad_TrophyAnimateOnly;
+
+				// reset for future gameplay
+				sdata->boolOpenTokenRelicMenu = 0;
+				warppadObj->boolEnteredWarppad = 0;
+
+				// Rem Adventure Arena
+				sdata->Loading.OnBegin.RemBitsConfig0 |= ADVENTURE_ARENA;
+
+				MainRaceTrack_RequestLoad(levelID);
+				goto WarpPad_TrophyAnimateOnly;
+			}
+		}
+	}
+
+	if (CHECK_ADV_BIT(sdata->advProgress.rewards, (levelID + 6)) != 0)
+	{
+		i = data.metaDataLEV[levelID].hubID + 0x5d;
+
+		if (CHECK_ADV_BIT(sdata->advProgress.rewards, i) == 0)
+			goto WarpPad_AnimateOpen;
+	}
+
+	warppadObj->boolEnteredWarppad = 1;
+	warppadObj->framesWarping++;
+	gGT->drivers[0]->funcPtrs[0] = VehStuckProc_Warp_Init;
+	if (warppadObj->framesWarping < 61)
+		goto WarpPad_AnimateOpen;
+
+WarpPad_RequestLoad:
+
+	// Rem Adventure Arena
+	sdata->Loading.OnBegin.RemBitsConfig0 |= ADVENTURE_ARENA;
+
+	MainRaceTrack_RequestLoad(levelID);
+	goto WarpPad_AnimateOpen;
+
+WarpPad_TrophyAnimateOnly:
+
+	if (warppadObj->framesWarping < 0x400)
+		warppadObj->framesWarping++;
+
+	warppadObj->boolEnteredWarppad = 1;
+
+	gGT->drivers[0]->funcPtrs[0] = VehStuckProc_Warp_Init;
+
+WarpPad_AnimateOpen:
+
 	if ((instArr[WPIS_OPEN_BEAM] != 0) && ((gGT->timer & 1) != 0))
 	{
 		warppadObj->spinRot_Beam[0] = 0;
@@ -423,219 +643,11 @@ void AH_WarpPad_ThTick(struct Thread *t)
 		warppadObj->spinRot_Rewards[1] += 0x4;
 	}
 
-	if ((dist <= 0x8fff) || (warppadObj->boolEnteredWarppad != 0))
+	if (instArr[WPIS_CLOSED_1S] != 0)
 	{
-		// Retail repeats this setup every close/warping frame before the
-		// transition/load gate.
-		LOAD_Robots1P(data.characterIDs[0]);
-
-		// spawn P1 in the back
-		sdata->kartSpawnOrderArray[0] = 7;
-
-		// variable reuse, get track speed champion
-		champID = data.metaDataLEV[levelID].characterID_Champion;
-
-		// default
-		champSlot = 0;
-
-		// If Speed Champion is on the track (Crash-Pura)
-		// and is not the same characterID as Player 1
-		if ((champID < 8) && (champID != data.characterIDs[0]))
-		{
-			// set everyone to spawn in order
-			for (i = 1; i < 8; i++)
-			{
-				if (champID == data.characterIDs[i])
-				{
-					sdata->kartSpawnOrderArray[i] = 0;
-					champSlot = i;
-				}
-
-				else if (i == 7)
-				{
-					sdata->kartSpawnOrderArray[7] = champSlot;
-				}
-
-				else
-				{
-					sdata->kartSpawnOrderArray[i] = i;
-				}
-			}
-		}
-
-		// Speed Champion is invalid
-		else
-		{
-			for (i = 1; i < 8; i++)
-				randKartSpawn[i] = i;
-
-			for (i = 0; i < 7; i++)
-			{
-				rng1 = RngDeadCoed(&sdata->const_0x30215400);
-
-				rng2 = 7 - i;
-
-				rng2 = (rng1 & 0xfff) % rng2 + 1;
-				rng2 = (s16)rng2;
-
-				sdata->kartSpawnOrderArray[randKartSpawn[rng2]] = (char)i;
-
-				while (rng2 < 7)
-				{
-					randKartSpawn[rng2] = randKartSpawn[rng2 + 1];
-					rng2++;
-				}
-			}
-		}
+		INSTANCE_Death(instArr[WPIS_CLOSED_1S]);
+		INSTANCE_Death(instArr[WPIS_CLOSED_10S]);
+		INSTANCE_Death(instArr[WPIS_CLOSED_X]);
+		INSTANCE_Death(instArr[WPIS_CLOSED_ITEM]);
 	}
-
-	if ((dist > 0x8fff) && (warppadObj->boolEnteredWarppad == 0))
-		return;
-
-	// if flag is on-screen, loading has already been finalized
-	if (RaceFlag_IsTransitioning() != 0)
-		return;
-
-	levelID = warppadObj->levelID;
-
-	// gem cups
-	if (levelID >= AH_WP_ADV_CUP)
-	{
-		warppadObj->boolEnteredWarppad = 1;
-		warppadObj->framesWarping++;
-		gGT->drivers[0]->funcPtrs[0] = VehStuckProc_Warp_Init;
-		if (warppadObj->framesWarping < 61)
-			return;
-
-		sdata->Loading.OnBegin.AddBitsConfig0 |= ADVENTURE_CUP;
-
-		gGT->cup.cupID = levelID - AH_WP_ADV_CUP;
-		gGT->cup.trackIndex = 0;
-		for (i = 0; i < 8; i++)
-			gGT->cup.points[i] = 0;
-
-		levelID = data.advCupTrackIDs[4 * gGT->cup.cupID];
-		goto WarpPad_RequestLoad;
-	}
-
-	// Slide Col or Turbo Track
-	if (((u16)(levelID - AH_WP_SLIDE_COLISEUM)) < 2)
-	{
-		warppadObj->boolEnteredWarppad = 1;
-		warppadObj->framesWarping++;
-		gGT->drivers[0]->funcPtrs[0] = VehStuckProc_Warp_Init;
-		if (warppadObj->framesWarping < 61)
-			return;
-
-		sdata->Loading.OnBegin.AddBitsConfig0 |= RELIC_RACE;
-		goto WarpPad_RequestLoad;
-	}
-
-	// Battle Tracks
-	if ((((u16)(levelID - AH_WP_NITRO_COURT)) < 2) || (levelID == 21) || (levelID == 23))
-	{
-		warppadObj->boolEnteredWarppad = 1;
-		warppadObj->framesWarping++;
-		gGT->drivers[0]->funcPtrs[0] = VehStuckProc_Warp_Init;
-		if (warppadObj->framesWarping < 61)
-			return;
-
-		sdata->Loading.OnBegin.AddBitsConfig0 |= CRYSTAL_CHALLENGE;
-
-		// Dont have hint "collect every crystal"
-		if ((sdata->advProgress.rewards[4] & 0x8000) == 0)
-			MainFrame_RequestMaskHint(0x19, 1);
-
-		// if can't spawn aku cause he's already here,
-		// quit function, wait till he's done to start race
-		i = AH_MaskHint_boolCanSpawn();
-		if ((i & 0xffff) == 0)
-			return;
-
-		gGT->originalEventTime = D232.timeCrystalChallenge[levelID - AH_WP_NITRO_COURT];
-		goto WarpPad_RequestLoad;
-	}
-
-	if (levelID < AH_WP_SLIDE_COLISEUM)
-	{
-		if (CHECK_ADV_BIT(sdata->advProgress.rewards, (levelID + 6)) != 0)
-		{
-			if (gGT->currAdvProfile.numTrophies >= data.metaDataLEV[levelID].numTrophiesToOpen)
-			{
-				if (warppadObj->framesWarping < 61)
-					goto WarpPad_TrophyAnimateOnly;
-
-				// if never opened
-				if (sdata->boolOpenTokenRelicMenu == 0)
-				{
-					if ((gGT->gameMode1 & ADVENTURE_ARENA) != 0)
-					{
-						D232.menuTokenRelic.rowSelected = (CHECK_ADV_BIT(sdata->advProgress.rewards, (levelID + 0x4c)) != 0);
-
-						RECTMENU_Show(&D232.menuTokenRelic);
-
-						// now opened
-						sdata->boolOpenTokenRelicMenu = 1;
-					}
-				}
-
-				// if opened, but not closed yet
-				if ((RECTMENU_BoolHidden(&D232.menuTokenRelic) & 0xffff) == 0)
-					goto WarpPad_TrophyAnimateOnly;
-
-				// Relic Hint
-				i = 0x1d;
-
-				// CTR Token Hint
-				if ((gGT->gameMode2 & 8) != 0)
-					i = 0x1a;
-
-				// if hint is locked
-				if (CHECK_ADV_BIT(sdata->advProgress.rewards, (i + 0x76)) == 0)
-					MainFrame_RequestMaskHint(i, 1);
-
-				// if can't spawn aku cause he's already here,
-				// quit function, wait till he's done to start race
-				i = AH_MaskHint_boolCanSpawn();
-				if ((i & 0xffff) == 0)
-					goto WarpPad_TrophyAnimateOnly;
-
-				// reset for future gameplay
-				sdata->boolOpenTokenRelicMenu = 0;
-				warppadObj->boolEnteredWarppad = 0;
-				goto WarpPad_RequestLoad;
-			}
-		}
-	}
-
-	if (CHECK_ADV_BIT(sdata->advProgress.rewards, (levelID + 6)) != 0)
-	{
-		i = data.metaDataLEV[levelID].hubID + 0x5d;
-
-		if (CHECK_ADV_BIT(sdata->advProgress.rewards, i) == 0)
-			return;
-	}
-
-	warppadObj->boolEnteredWarppad = 1;
-	warppadObj->framesWarping++;
-	gGT->drivers[0]->funcPtrs[0] = VehStuckProc_Warp_Init;
-	if (warppadObj->framesWarping < 61)
-		return;
-
-WarpPad_RequestLoad:
-
-	// Rem Adventure Arena
-	sdata->Loading.OnBegin.RemBitsConfig0 |= ADVENTURE_ARENA;
-
-	MainRaceTrack_RequestLoad(levelID);
-	return;
-
-WarpPad_TrophyAnimateOnly:
-
-	if (warppadObj->framesWarping < 0x400)
-		warppadObj->framesWarping++;
-
-	warppadObj->boolEnteredWarppad = 1;
-
-	gGT->drivers[0]->funcPtrs[0] = VehStuckProc_Warp_Init;
 }

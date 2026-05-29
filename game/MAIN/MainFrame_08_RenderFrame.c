@@ -102,10 +102,7 @@ void MainFrame_RenderFrame(struct GameTracker *gGT, struct GamepadSystem *gGamep
 #if !defined(REBUILD_PS1) || defined(CTR_NATIVE)
 	RenderAllBeakerRain(gGT);
 
-// DEAD CODE
-#if 0
 	RenderAllBoxSceneSplitLines(gGT);
-#endif
 #endif
 
 #if !defined(REBUILD_PS1) || defined(CTR_NATIVE)
@@ -297,7 +294,7 @@ void DrawUnpluggedMsg(struct GameTracker *gGT, struct GamepadSystem *gGamepads)
 	if ((gGT->gameMode1 & GAME_CUTSCENE) != 0)
 		return;
 
-#ifndef REBUILD_PS1
+#if !defined(REBUILD_PS1) || defined(CTR_NATIVE)
 	if (MainFrame_HaveAllPads(gGT->numPlyrNextGame) == 1)
 		return;
 #else
@@ -519,7 +516,7 @@ void RenderAllHUD(struct GameTracker *gGT)
 
 // Why is this needed? What's broken
 // that causes this to run premature?
-#ifdef REBUILD_PS1
+#if defined(REBUILD_PS1) && !defined(CTR_NATIVE)
 	// LOADING... and pause screen (see adv pause)
 	if ((gGT->gameMode1 & 0x4000000f) != 0)
 		return;
@@ -532,7 +529,7 @@ void RenderAllHUD(struct GameTracker *gGT)
 	// if drawing intro-race title bars
 	if ((gGT->numPlyrCurrGame == 1) && ((hudFlags & 8) != 0) && ((gameMode1 & START_OF_RACE) != 0))
 	{
-#ifndef REBUILD_PS1
+#if !defined(REBUILD_PS1) || defined(CTR_NATIVE)
 		UI_RaceStart_IntroText1P();
 #endif
 	}
@@ -622,7 +619,7 @@ void RenderAllHUD(struct GameTracker *gGT)
 				// and load the 232 overlay
 				if (gGT->overlayTransition > 1)
 				{
-#ifndef REBUILD_PS1
+#if !defined(REBUILD_PS1) || defined(CTR_NATIVE)
 					gGT->overlayTransition--;
 					if (gGT->overlayTransition == 1)
 						LOAD_OvrThreads(2);
@@ -693,24 +690,17 @@ void RenderAllBeakerRain(struct GameTracker *gGT)
 	RedBeaker_RenderRain(&gGT->pushBuffer[0], &gGT->backBuffer->primMem, &gGT->JitPools.rain, numPlyrCurrGame, gGT->gameMode1 & PAUSE_ALL);
 }
 
-// DEAD CODE,
-// vertSplit is set to zero from INSTANCE_Birth,
-// and the value set in this function is zero anyway
-#if 0
-void RenderAllBoxSceneSplitLines(struct GameTracker* gGT)
+void RenderAllBoxSceneSplitLines(struct GameTracker *gGT)
 {
-	// check 233 overlay, cause levelID is set
-	// and MainFrame_RenderFrame runs, before 233 loads
-	if(LOAD_IsOpen_Podiums() != 0)
+	// Check 233 overlay, cause levelID is set and MainFrame_RenderFrame runs before 233 loads.
+	if (LOAD_IsOpen_Podiums() != 0)
 	{
-		// ND Box Scene
-		if(gGT->levelID == NAUGHTY_DOG_CRATE)
+		if (gGT->levelID == NAUGHTY_DOG_CRATE)
 		{
 			CS_BoxScene_InstanceSplitLines();
 		}
 	}
 }
-#endif
 
 #endif
 

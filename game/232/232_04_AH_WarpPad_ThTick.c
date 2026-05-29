@@ -1,7 +1,6 @@
 #include <common.h>
 
-// NOTE(aalhendi): Source-backed partial for NTSC-U 926 0x800abf48-0x800ad2c8.
-// Full-body branch/register audit remains pending before ASM verification.
+// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800abf48-0x800ad2c8.
 void AH_WarpPad_ThTick(struct Thread *t)
 {
 	int i;
@@ -297,8 +296,8 @@ void AH_WarpPad_ThTick(struct Thread *t)
 	champSlot = 0;
 
 	// If Speed Champion is on the track (Crash-Pura)
-	// and is not the same characterID as Player 1
-	if ((champID < 8) && (champID != data.characterIDs[0]))
+	// and is not the same characterID as this driver
+	if ((champID < 8) && (champID != data.characterIDs[driver->driverID]))
 	{
 		// set everyone to spawn in order
 		for (i = 1; i < 8; i++)

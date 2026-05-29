@@ -33,7 +33,7 @@ u32 main(void)
 
 	do
 	{
-#if 0
+#ifndef CTR_NATIVE
 		// wont happen under normal conditions
 		if (sdata->mainGameState == 5)
 		{
@@ -427,33 +427,33 @@ u32 main(void)
 			}
 			break;
 
-#if 0
-			// In theory, this is left over from the demos,
-			// which would "timeout" and restart after sitting idle
-			case 4:
+#ifndef CTR_NATIVE
+		// In theory, this is left over from the demos,
+		// which would "timeout" and restart after sitting idle
+		case 4:
 
-				// erase all data past the
-				// last 3 bookmarks, if there
-				// that many exist
-				MEMPACK_PopState();
-				MEMPACK_PopState();
-				MEMPACK_PopState();
+			// erase all data past the
+			// last 3 bookmarks, if there
+			// that many exist
+			MEMPACK_PopState();
+			MEMPACK_PopState();
+			MEMPACK_PopState();
 
-				CTR_ErrorScreen(0, 0, 0);
-				Music_Stop();
+			CTR_ErrorScreen(0, 0, 0);
+			Music_Stop();
 
-				// clear backup, destroy music, destroy all fx
-				howl_StopAudio(1, 1, 1);
-				Bank_DestroyAll();
-				howl_Disable();
+			// clear backup, destroy music, destroy all fx
+			howl_StopAudio(1, 1, 1);
+			Bank_DestroyAll();
+			howl_Disable();
 
-				GAMEPAD_SetMainMode();
+			GAMEPAD_SetMainMode();
 
-				// Set vsync to 2 FPS
-				VSync(30);
+			// Set vsync to 2 FPS
+			VSync(30);
 
-				// reboot game
-				sdata->mainGameState = 0;
+			// reboot game
+			sdata->mainGameState = 0;
 #endif
 		}
 	} while (true);

@@ -238,7 +238,13 @@ void AH_Pause_Draw(int pageID, int posX)
 
 	else if (type == 1)
 	{
-		int *ptrTokenCount = &sdata->gGT->currAdvProfile.numCtrTokens.red;
+		int tokenCount[5] = {0, 0, 0, 0, 0};
+
+		for (int i = 0; i < SLIDE_COLISEUM; i++)
+		{
+			if (CHECK_ADV_BIT(adv->rewards, (i + 0x4c)) != 0)
+				tokenCount[data.metaDataLEV[i].ctrTokenGroupID]++;
+		}
 
 		for (int i = 0; i < 5; i++)
 		{
@@ -255,14 +261,14 @@ void AH_Pause_Draw(int pageID, int posX)
 
 			inst->matrix.t[1] = UI_ConvertY_2(instPosY + 0x41, 0x100);
 
-			SelectProfile_PrintInteger(ptrTokenCount[i], instPosX + 0x36, instPosY + 0x3a, 0, 0);
+			SelectProfile_PrintInteger(tokenCount[i], instPosX + 0x36, instPosY + 0x3a, 0, 0);
 
 			int strX = 'X'; //"X\0\0" + nullterm
 			DecalFont_DrawLine((char *)&strX, instPosX + 0x24, instPosY + 0x3e, FONT_SMALL, 0);
 		}
 	}
 
-	else
+	else if (type == 2)
 	{
 		int count[3];
 		count[0] = 0;

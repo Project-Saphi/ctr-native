@@ -1,6 +1,11 @@
 #pragma once
 
 #ifdef CTR_NATIVE
+#include <stdio.h>
+#include <stdlib.h>
+#endif
+
+#ifdef CTR_NATIVE
 #define ADD_PSX_ADDRESS
 #else
 #define ADD_PSX_ADDRESS ^0x80000000
@@ -13,7 +18,17 @@ force_inline u32 CtrGpu_PrimToOTLink(const void *prim)
 
 force_inline u32 CtrGpu_PrimToOTLink24(const void *prim)
 {
-	return (u32)((uintptr_t)prim & 0xffffff);
+	uintptr_t addr = (uintptr_t)prim;
+
+#ifdef CTR_NATIVE
+	if ((addr & ~(uintptr_t)0xffffffu) != 0)
+	{
+		fprintf(stderr, "[CTR Native] GPU OT 24-bit link overflow: prim=%p truncated=%06x\n", (void *)prim, (u32)(addr & 0xffffffu));
+		abort();
+	}
+#endif
+
+	return (u32)(addr & 0xffffffu);
 }
 
 force_inline void CtrGpu_LinkPrimToOT(u_long *ot, const void *prim)

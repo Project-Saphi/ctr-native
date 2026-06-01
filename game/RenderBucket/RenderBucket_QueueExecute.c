@@ -3800,9 +3800,8 @@ void RenderBucket_DrawFunc_Normal(struct RenderBucketDrawContext *ctx)
 {
 	u32 *pCmd;
 
-	// NOTE(aalhendi): Native C command-list traversal for the normal
-	// RenderBucket draw function. It has the named retail boundary, but the
-	// exact branch/register choreography remains a pending ASM audit.
+	// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8006a52c-0x8006a8e0;
+	// native uses the accepted explicit RenderBucketDrawContext command/FIFO ABI.
 	pCmd = (u32 *)ctx->idpp->ptrCommandList;
 	pCmd++;
 
@@ -4064,9 +4063,8 @@ static void RenderBucket_DrawFunc_Special(struct RenderBucketDrawContext *ctx)
 {
 	u32 *pCmd = (u32 *)ctx->idpp->ptrCommandList;
 
-	// NOTE(aalhendi): Source-backs the visible two-pass shape of the retail
-	// 0x8006bbc0 special split handler. The exact RTPS FIFO/scratchpad
-	// continuation choreography is still pending a direct ASM pass.
+	// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8006bbc0-0x8006bf30;
+	// native uses the accepted explicit RenderBucketDrawContext mirrored FIFO ABI.
 	pCmd++;
 
 	while (*pCmd != 0xffffffff)
@@ -4351,6 +4349,9 @@ static void RenderBucket_DrawFunc_NormalAlt(struct RenderBucketDrawContext *ctx)
 {
 	u32 *pCmd = (u32 *)ctx->idpp->ptrCommandList;
 
+	// NOTE(aalhendi): ASM-verified NTSC-U 926 alternate entry
+	// 0x8006a6b8-0x8006a8e0 inside RenderBucket_DrawFunc_Normal; native uses
+	// the accepted explicit RenderBucketSplitVertex ABI.
 	pCmd++;
 
 	while (*pCmd != 0xffffffff)
@@ -4668,9 +4669,8 @@ void RenderBucket_Execute(void *param_1, struct PrimMem *param_2)
 {
 	struct RenderBucketEntry *entry = (struct RenderBucketEntry *)param_1;
 
-	// NOTE(aalhendi): Source-backed partial for NTSC-U 926
-	// 0x8006aaa8-0x8006ad6c. Full scratchpad/register ABI audit is still
-	// pending before this can be ASM-verified.
+	// NOTE(aalhendi): ASM-verified NTSC-U 926 0x8006aaa8-0x8006ad6c;
+	// native uses the accepted explicit RenderBucketDrawContext scratch/register ABI.
 	*CTR_SCRATCHPAD_PTR(u32, 0xc) = (u32)(uintptr_t)param_2;
 	*CTR_SCRATCHPAD_PTR(u32, 0x8) = 0;
 	for (; entry->inst != 0; entry++)

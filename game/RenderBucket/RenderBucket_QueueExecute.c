@@ -2331,6 +2331,12 @@ static void RenderBucket_LoadProjectedRegs(const struct RenderBucketProjectedReg
 	MTC2(regs->sz3, 19);
 }
 
+static int RenderBucket_RestoreProjectedRegsAndReturn(const struct RenderBucketProjectedRegs *regs, int ret)
+{
+	RenderBucket_LoadProjectedRegs(regs);
+	return ret;
+}
+
 static int RenderBucket_CheckProjectedPrim(struct RenderBucketDrawContext *ctx, u32 command, u32 gteFlag, u16 cullXorMask, int *depthMac0Out)
 {
 	int depthMac0;
@@ -3449,8 +3455,8 @@ static void RenderBucket_ProjectSplitVertex(struct RenderBucketDrawContext *ctx,
 	MTC2(v->xy, 0);
 	MTC2(v->z, 1);
 	gte_rtps();
-	v->sxy = MFC2(12);
-	v->sz = MFC2(17);
+	v->sxy = MFC2(14);
+	v->sz = MFC2(19);
 }
 
 static void RenderBucket_BuildDepthSplitIntersection(struct RenderBucketDrawContext *ctx, struct RenderBucketSplitVertex *dst,
@@ -3485,6 +3491,7 @@ static int RenderBucket_DrawSplitClipped(struct RenderBucketDrawContext *ctx, u3
 	const struct RenderBucketSplitVertex *a;
 	const struct RenderBucketSplitVertex *b;
 	const struct RenderBucketSplitVertex *c;
+	struct RenderBucketProjectedRegs savedRegs;
 	struct RenderBucketSplitVertex ab;
 	struct RenderBucketSplitVertex ac;
 	struct RenderBucketSplitVertex bc;
@@ -3495,6 +3502,7 @@ static int RenderBucket_DrawSplitClipped(struct RenderBucketDrawContext *ctx, u3
 	int signMask = 0;
 
 	RenderBucket_AssignSplitUvs(ctx, tex);
+	RenderBucket_StoreProjectedRegs(&savedRegs);
 
 	a = &ctx->tempSplit[1];
 	b = &ctx->tempSplit[2];
@@ -3514,10 +3522,11 @@ static int RenderBucket_DrawSplitClipped(struct RenderBucketDrawContext *ctx, u3
 	switch (signMask)
 	{
 	case 0:
-		return 0;
+		return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, 0);
 
 	case 7:
-		return RenderBucket_DrawDepthSplitCandidate(ctx, command, tex, ctx->idpp->unkE4, depthMac0, a, b, c, a->splitDist);
+		return RenderBucket_RestoreProjectedRegsAndReturn(
+		    &savedRegs, RenderBucket_DrawDepthSplitCandidate(ctx, command, tex, ctx->idpp->unkE4, depthMac0, a, b, c, a->splitDist));
 
 	case 1:
 		primaryRange = ctx->idpp->unkE8;
@@ -3525,10 +3534,11 @@ static int RenderBucket_DrawSplitClipped(struct RenderBucketDrawContext *ctx, u3
 		RenderBucket_BuildDepthSplitIntersection(ctx, &ab, a, b, hasTexture);
 		RenderBucket_BuildDepthSplitIntersection(ctx, &ac, a, c, hasTexture);
 		if (RenderBucket_DrawDepthSplitCandidate(ctx, command, tex, primaryRange, depthMac0, c, &ac, &ab, c->splitDist) < 0)
-			return -1;
+			return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, -1);
 		if (RenderBucket_DrawDepthSplitCandidate(ctx, command, tex, primaryRange, depthMac0, b, c, &ab, b->splitDist) < 0)
-			return -1;
-		return RenderBucket_DrawDepthSplitCandidate(ctx, command, tex, secondaryRange, depthMac0, &ac, a, &ab, a->splitDist);
+			return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, -1);
+		return RenderBucket_RestoreProjectedRegsAndReturn(
+		    &savedRegs, RenderBucket_DrawDepthSplitCandidate(ctx, command, tex, secondaryRange, depthMac0, &ac, a, &ab, a->splitDist));
 
 	case 2:
 		primaryRange = ctx->idpp->unkE8;
@@ -3536,10 +3546,11 @@ static int RenderBucket_DrawSplitClipped(struct RenderBucketDrawContext *ctx, u3
 		RenderBucket_BuildDepthSplitIntersection(ctx, &ab, a, b, hasTexture);
 		RenderBucket_BuildDepthSplitIntersection(ctx, &cb, c, b, hasTexture);
 		if (RenderBucket_DrawDepthSplitCandidate(ctx, command, tex, primaryRange, depthMac0, c, a, &ab, a->splitDist) < 0)
-			return -1;
+			return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, -1);
 		if (RenderBucket_DrawDepthSplitCandidate(ctx, command, tex, primaryRange, depthMac0, &cb, c, &ab, c->splitDist) < 0)
-			return -1;
-		return RenderBucket_DrawDepthSplitCandidate(ctx, command, tex, secondaryRange, depthMac0, b, &cb, &ab, b->splitDist);
+			return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, -1);
+		return RenderBucket_RestoreProjectedRegsAndReturn(
+		    &savedRegs, RenderBucket_DrawDepthSplitCandidate(ctx, command, tex, secondaryRange, depthMac0, b, &cb, &ab, b->splitDist));
 
 	case 4:
 		primaryRange = ctx->idpp->unkE8;
@@ -3547,10 +3558,11 @@ static int RenderBucket_DrawSplitClipped(struct RenderBucketDrawContext *ctx, u3
 		RenderBucket_BuildDepthSplitIntersection(ctx, &ac, a, c, hasTexture);
 		RenderBucket_BuildDepthSplitIntersection(ctx, &bc, b, c, hasTexture);
 		if (RenderBucket_DrawDepthSplitCandidate(ctx, command, tex, primaryRange, depthMac0, b, &bc, &ac, b->splitDist) < 0)
-			return -1;
+			return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, -1);
 		if (RenderBucket_DrawDepthSplitCandidate(ctx, command, tex, primaryRange, depthMac0, a, b, &ac, a->splitDist) < 0)
-			return -1;
-		return RenderBucket_DrawDepthSplitCandidate(ctx, command, tex, secondaryRange, depthMac0, &bc, c, &ac, c->splitDist);
+			return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, -1);
+		return RenderBucket_RestoreProjectedRegsAndReturn(
+		    &savedRegs, RenderBucket_DrawDepthSplitCandidate(ctx, command, tex, secondaryRange, depthMac0, &bc, c, &ac, c->splitDist));
 
 	case 3:
 		primaryRange = ctx->idpp->unkE4;
@@ -3558,10 +3570,11 @@ static int RenderBucket_DrawSplitClipped(struct RenderBucketDrawContext *ctx, u3
 		RenderBucket_BuildDepthSplitIntersection(ctx, &ac, a, c, hasTexture);
 		RenderBucket_BuildDepthSplitIntersection(ctx, &bc, b, c, hasTexture);
 		if (RenderBucket_DrawDepthSplitCandidate(ctx, command, tex, primaryRange, depthMac0, b, &bc, &ac, b->splitDist) < 0)
-			return -1;
+			return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, -1);
 		if (RenderBucket_DrawDepthSplitCandidate(ctx, command, tex, primaryRange, depthMac0, a, b, &ac, a->splitDist) < 0)
-			return -1;
-		return RenderBucket_DrawDepthSplitCandidate(ctx, command, tex, secondaryRange, depthMac0, &bc, c, &ac, c->splitDist);
+			return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, -1);
+		return RenderBucket_RestoreProjectedRegsAndReturn(
+		    &savedRegs, RenderBucket_DrawDepthSplitCandidate(ctx, command, tex, secondaryRange, depthMac0, &bc, c, &ac, c->splitDist));
 
 	case 5:
 		primaryRange = ctx->idpp->unkE4;
@@ -3569,10 +3582,11 @@ static int RenderBucket_DrawSplitClipped(struct RenderBucketDrawContext *ctx, u3
 		RenderBucket_BuildDepthSplitIntersection(ctx, &ab, a, b, hasTexture);
 		RenderBucket_BuildDepthSplitIntersection(ctx, &cb, c, b, hasTexture);
 		if (RenderBucket_DrawDepthSplitCandidate(ctx, command, tex, primaryRange, depthMac0, c, a, &ab, a->splitDist) < 0)
-			return -1;
+			return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, -1);
 		if (RenderBucket_DrawDepthSplitCandidate(ctx, command, tex, primaryRange, depthMac0, &cb, c, &ab, c->splitDist) < 0)
-			return -1;
-		return RenderBucket_DrawDepthSplitCandidate(ctx, command, tex, secondaryRange, depthMac0, b, &cb, &ab, b->splitDist);
+			return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, -1);
+		return RenderBucket_RestoreProjectedRegsAndReturn(
+		    &savedRegs, RenderBucket_DrawDepthSplitCandidate(ctx, command, tex, secondaryRange, depthMac0, b, &cb, &ab, b->splitDist));
 
 	case 6:
 		primaryRange = ctx->idpp->unkE4;
@@ -3580,13 +3594,14 @@ static int RenderBucket_DrawSplitClipped(struct RenderBucketDrawContext *ctx, u3
 		RenderBucket_BuildDepthSplitIntersection(ctx, &ab, a, b, hasTexture);
 		RenderBucket_BuildDepthSplitIntersection(ctx, &ac, a, c, hasTexture);
 		if (RenderBucket_DrawDepthSplitCandidate(ctx, command, tex, primaryRange, depthMac0, c, &ac, &ab, c->splitDist) < 0)
-			return -1;
+			return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, -1);
 		if (RenderBucket_DrawDepthSplitCandidate(ctx, command, tex, primaryRange, depthMac0, b, c, &ab, b->splitDist) < 0)
-			return -1;
-		return RenderBucket_DrawDepthSplitCandidate(ctx, command, tex, secondaryRange, depthMac0, &ac, a, &ab, a->splitDist);
+			return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, -1);
+		return RenderBucket_RestoreProjectedRegsAndReturn(
+		    &savedRegs, RenderBucket_DrawDepthSplitCandidate(ctx, command, tex, secondaryRange, depthMac0, &ac, a, &ab, a->splitDist));
 	}
 
-	return 0;
+	return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, 0);
 }
 
 static void RenderBucket_BuildWaterSplitIntersection(struct RenderBucketDrawContext *ctx, struct RenderBucketSplitVertex *dst,
@@ -3693,6 +3708,7 @@ static int RenderBucket_DrawWaterSplitClipped(struct RenderBucketDrawContext *ct
 	const struct RenderBucketSplitVertex *a;
 	const struct RenderBucketSplitVertex *b;
 	const struct RenderBucketSplitVertex *c;
+	struct RenderBucketProjectedRegs savedRegs;
 	struct RenderBucketSplitVertex ab;
 	struct RenderBucketSplitVertex ac;
 	struct RenderBucketSplitVertex bc;
@@ -3703,6 +3719,7 @@ static int RenderBucket_DrawWaterSplitClipped(struct RenderBucketDrawContext *ct
 	int signMask = 0;
 
 	RenderBucket_AssignSplitUvs(ctx, tex);
+	RenderBucket_StoreProjectedRegs(&savedRegs);
 
 	a = &ctx->tempSplit[1];
 	b = &ctx->tempSplit[2];
@@ -3721,10 +3738,12 @@ static int RenderBucket_DrawWaterSplitClipped(struct RenderBucketDrawContext *ct
 	switch (signMask)
 	{
 	case 0:
-		return RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, ctx->idpp->unkE8, depthMac0, a, b, c, a->splitDist);
+		return RenderBucket_RestoreProjectedRegsAndReturn(
+		    &savedRegs, RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, ctx->idpp->unkE8, depthMac0, a, b, c, a->splitDist));
 
 	case 7:
-		return RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, ctx->idpp->unkE4, depthMac0, a, b, c, a->splitDist);
+		return RenderBucket_RestoreProjectedRegsAndReturn(
+		    &savedRegs, RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, ctx->idpp->unkE4, depthMac0, a, b, c, a->splitDist));
 
 	case 1:
 		primaryRange = ctx->idpp->unkE8;
@@ -3732,10 +3751,11 @@ static int RenderBucket_DrawWaterSplitClipped(struct RenderBucketDrawContext *ct
 		RenderBucket_BuildWaterSplitIntersection(ctx, &ab, a, b, hasTexture);
 		RenderBucket_BuildWaterSplitIntersection(ctx, &ac, a, c, hasTexture);
 		if (RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, primaryRange, depthMac0, c, &ac, &ab, c->splitDist) < 0)
-			return -1;
+			return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, -1);
 		if (RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, primaryRange, depthMac0, b, c, &ab, b->splitDist) < 0)
-			return -1;
-		return RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, secondaryRange, depthMac0, &ac, a, &ab, a->splitDist);
+			return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, -1);
+		return RenderBucket_RestoreProjectedRegsAndReturn(
+		    &savedRegs, RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, secondaryRange, depthMac0, &ac, a, &ab, a->splitDist));
 
 	case 6:
 		primaryRange = ctx->idpp->unkE4;
@@ -3743,10 +3763,11 @@ static int RenderBucket_DrawWaterSplitClipped(struct RenderBucketDrawContext *ct
 		RenderBucket_BuildWaterSplitIntersection(ctx, &ab, a, b, hasTexture);
 		RenderBucket_BuildWaterSplitIntersection(ctx, &ac, a, c, hasTexture);
 		if (RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, primaryRange, depthMac0, c, &ac, &ab, c->splitDist) < 0)
-			return -1;
+			return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, -1);
 		if (RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, primaryRange, depthMac0, b, c, &ab, b->splitDist) < 0)
-			return -1;
-		return RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, secondaryRange, depthMac0, &ac, a, &ab, a->splitDist);
+			return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, -1);
+		return RenderBucket_RestoreProjectedRegsAndReturn(
+		    &savedRegs, RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, secondaryRange, depthMac0, &ac, a, &ab, a->splitDist));
 
 	case 2:
 		primaryRange = ctx->idpp->unkE8;
@@ -3754,10 +3775,11 @@ static int RenderBucket_DrawWaterSplitClipped(struct RenderBucketDrawContext *ct
 		RenderBucket_BuildWaterSplitIntersection(ctx, &ab, a, b, hasTexture);
 		RenderBucket_BuildWaterSplitIntersection(ctx, &cb, c, b, hasTexture);
 		if (RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, primaryRange, depthMac0, c, a, &ab, a->splitDist) < 0)
-			return -1;
+			return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, -1);
 		if (RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, primaryRange, depthMac0, &cb, c, &ab, c->splitDist) < 0)
-			return -1;
-		return RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, secondaryRange, depthMac0, b, &cb, &ab, b->splitDist);
+			return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, -1);
+		return RenderBucket_RestoreProjectedRegsAndReturn(
+		    &savedRegs, RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, secondaryRange, depthMac0, b, &cb, &ab, b->splitDist));
 
 	case 5:
 		primaryRange = ctx->idpp->unkE4;
@@ -3765,10 +3787,11 @@ static int RenderBucket_DrawWaterSplitClipped(struct RenderBucketDrawContext *ct
 		RenderBucket_BuildWaterSplitIntersection(ctx, &ab, a, b, hasTexture);
 		RenderBucket_BuildWaterSplitIntersection(ctx, &cb, c, b, hasTexture);
 		if (RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, primaryRange, depthMac0, c, a, &ab, a->splitDist) < 0)
-			return -1;
+			return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, -1);
 		if (RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, primaryRange, depthMac0, &cb, c, &ab, c->splitDist) < 0)
-			return -1;
-		return RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, secondaryRange, depthMac0, b, &cb, &ab, b->splitDist);
+			return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, -1);
+		return RenderBucket_RestoreProjectedRegsAndReturn(
+		    &savedRegs, RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, secondaryRange, depthMac0, b, &cb, &ab, b->splitDist));
 
 	case 3:
 		primaryRange = ctx->idpp->unkE4;
@@ -3776,10 +3799,11 @@ static int RenderBucket_DrawWaterSplitClipped(struct RenderBucketDrawContext *ct
 		RenderBucket_BuildWaterSplitIntersection(ctx, &ac, a, c, hasTexture);
 		RenderBucket_BuildWaterSplitIntersection(ctx, &bc, b, c, hasTexture);
 		if (RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, primaryRange, depthMac0, b, &bc, &ac, b->splitDist) < 0)
-			return -1;
+			return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, -1);
 		if (RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, primaryRange, depthMac0, a, b, &ac, a->splitDist) < 0)
-			return -1;
-		return RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, secondaryRange, depthMac0, &bc, c, &ac, c->splitDist);
+			return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, -1);
+		return RenderBucket_RestoreProjectedRegsAndReturn(
+		    &savedRegs, RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, secondaryRange, depthMac0, &bc, c, &ac, c->splitDist));
 
 	case 4:
 		primaryRange = ctx->idpp->unkE8;
@@ -3787,13 +3811,14 @@ static int RenderBucket_DrawWaterSplitClipped(struct RenderBucketDrawContext *ct
 		RenderBucket_BuildWaterSplitIntersection(ctx, &ac, a, c, hasTexture);
 		RenderBucket_BuildWaterSplitIntersection(ctx, &bc, b, c, hasTexture);
 		if (RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, primaryRange, depthMac0, b, &bc, &ac, b->splitDist) < 0)
-			return -1;
+			return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, -1);
 		if (RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, primaryRange, depthMac0, a, b, &ac, a->splitDist) < 0)
-			return -1;
-		return RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, secondaryRange, depthMac0, &bc, c, &ac, c->splitDist);
+			return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, -1);
+		return RenderBucket_RestoreProjectedRegsAndReturn(
+		    &savedRegs, RenderBucket_DrawWaterSplitCandidate(ctx, command, tex, secondaryRange, depthMac0, &bc, c, &ac, c->splitDist));
 	}
 
-	return 0;
+	return RenderBucket_RestoreProjectedRegsAndReturn(&savedRegs, 0);
 }
 
 void RenderBucket_DrawFunc_Normal(struct RenderBucketDrawContext *ctx)

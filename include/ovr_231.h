@@ -651,23 +651,29 @@ struct Turtle
 	s16 timer;
 
 	// 0x2
-	// 0 from moment it hits top to moment it hits bottom
-	// 1 from moment it hits bottom to moment it hits top
+	// 0 from moment it hits bottom to moment it hits top
+	// 1 from moment it hits top to moment it hits bottom
 	s16 direction;
 
 	// 0x4
-	s16 unk4;
-
-	// 0x6
 	s16 turtleID;
 
+	// 0x6
+	s16 unk6;
+
 	// 0x8
-	// 0 - fully up (big jump)
-	// 1 - not fully up (small jump)
+	// 0 - fully down
+	// 1 - not fully down
 	s16 state;
+
+	// 0xA
+	s16 unkA;
 
 	// 0xC bytes large
 };
+_Static_assert(offsetof(struct Turtle, turtleID) == 0x4);
+_Static_assert(offsetof(struct Turtle, state) == 0x8);
+_Static_assert(sizeof(struct Turtle) == 0xc);
 
 struct OverlayRDATA_231
 {

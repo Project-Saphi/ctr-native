@@ -4,6 +4,51 @@
 #include <platform/native_audio.h>
 #endif
 
+#if defined(CTR_NATIVE)
+static void CDSYS_SaveMaxSample(int max)
+{
+	// save max for this block
+	sdata->XA_MaxSampleVal = max;
+	sdata->XA_MaxSampleValArr[sdata->XA_MaxSampleIndex] = max;
+
+	// Cycle through ring buffer
+	sdata->XA_MaxSampleIndex++;
+	if (sdata->XA_MaxSampleIndex >= 3)
+		sdata->XA_MaxSampleIndex = 0;
+
+	if (sdata->XA_MaxSampleNumSaved < 3)
+		sdata->XA_MaxSampleNumSaved++;
+
+	// Find max of last 3 block maxes,
+	// as long as 3 blocks have already passed
+	sdata->XA_MaxSampleValInArr = 0;
+	int index = sdata->XA_MaxSampleIndex;
+	for (int i = sdata->XA_MaxSampleNumSaved; i > 0; i--)
+	{
+		index--;
+		if (index < 0)
+			index = 2;
+
+		if (sdata->XA_MaxSampleValInArr < sdata->XA_MaxSampleValArr[index])
+			sdata->XA_MaxSampleValInArr = sdata->XA_MaxSampleValArr[index];
+	}
+}
+
+void CDSYS_SpuGetMaxSampleAtOffset(int xaCurrOffset)
+{
+	// NOTE(aalhendi): Retail reads decoded CD-XA samples from SPU IRQ
+	// buffers. Native XA is decoded by the SDL mixer, so feed the same
+	// amplitude globals from the matching native PCM block.
+	if (sdata->boolUseDisc == 0)
+	{
+		CDSYS_SaveMaxSample(NativeAudio_GetXAMaxSampleAtOffset(xaCurrOffset));
+		return;
+	}
+
+	CDSYS_SpuGetMaxSample();
+}
+#endif
+
 // NOTE(aalhendi): ASM-verified NTSC-U 926 0x8001ca98-0x8001cbe0.
 void CDSYS_SpuGetMaxSample(void)
 {
@@ -14,11 +59,8 @@ void CDSYS_SpuGetMaxSample(void)
 #if defined(CTR_NATIVE)
 	if (sdata->boolUseDisc == 0)
 	{
-		// NOTE(aalhendi): Retail reads decoded CD-XA samples from SPU IRQ
-		// buffers. Native XA is decoded by the SDL mixer, so feed the same
-		// amplitude globals from the native PCM cursor.
-		max = NativeAudio_GetXAMaxSample();
-		goto saveMaxSample;
+		CDSYS_SaveMaxSample(NativeAudio_GetXAMaxSample());
+		return;
 	}
 #endif
 
@@ -45,7 +87,9 @@ void CDSYS_SpuGetMaxSample(void)
 			max = sample;
 	}
 
-saveMaxSample:
+#if defined(CTR_NATIVE)
+	CDSYS_SaveMaxSample(max);
+#else
 	// save max for this block
 	sdata->XA_MaxSampleVal = max;
 	sdata->XA_MaxSampleValArr[sdata->XA_MaxSampleIndex] = max;
@@ -71,4 +115,5 @@ saveMaxSample:
 		if (sdata->XA_MaxSampleValInArr < sdata->XA_MaxSampleValArr[index])
 			sdata->XA_MaxSampleValInArr = sdata->XA_MaxSampleValArr[index];
 	}
+#endif
 }

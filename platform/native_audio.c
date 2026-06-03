@@ -2813,18 +2813,13 @@ int NativeAudio_GetXACurrOffset(void)
 	return offset;
 }
 
-int NativeAudio_GetXAMaxSample(void)
+static int NativeAudio_GetXAMaxSampleAtSourceFrameNoLock(u64 frameIndex)
 {
 	int max = 0;
 	int frame;
 
-	if (s_audio.output.device != 0)
-		SDL_LockAudioDevice(s_audio.output.device);
-
 	if (s_audio.xa.active && s_audio.xa.pcm != NULL)
 	{
-		u64 frameIndex = s_audio.xa.positionFp >> NATIVE_AUDIO_FP_SHIFT;
-
 		for (frame = 0; frame < 0x80; frame++)
 		{
 			int left;
@@ -2846,6 +2841,43 @@ int NativeAudio_GetXAMaxSample(void)
 			if (max < right)
 				max = right;
 		}
+	}
+
+	return max;
+}
+
+int NativeAudio_GetXAMaxSample(void)
+{
+	int max;
+
+	if (s_audio.output.device != 0)
+		SDL_LockAudioDevice(s_audio.output.device);
+
+	max = NativeAudio_GetXAMaxSampleAtSourceFrameNoLock(s_audio.xa.positionFp >> NATIVE_AUDIO_FP_SHIFT);
+
+	if (s_audio.output.device != 0)
+		SDL_UnlockAudioDevice(s_audio.output.device);
+
+	return max;
+}
+
+int NativeAudio_GetXAMaxSampleAtOffset(int xaCurrOffset)
+{
+	u64 outputFrame;
+	u64 sourceFrame;
+	int max = 0;
+
+	if (xaCurrOffset < 0)
+		return 0;
+
+	if (s_audio.output.device != 0)
+		SDL_LockAudioDevice(s_audio.output.device);
+
+	if ((s_audio.xa.active != 0) && (s_audio.xa.pcm != NULL) && (s_audio.xa.sampleRate > 0))
+	{
+		outputFrame = (u64)xaCurrOffset << 8;
+		sourceFrame = (outputFrame * (u64)s_audio.xa.sampleRate) / NATIVE_AUDIO_SAMPLE_RATE;
+		max = NativeAudio_GetXAMaxSampleAtSourceFrameNoLock(sourceFrame);
 	}
 
 	if (s_audio.output.device != 0)

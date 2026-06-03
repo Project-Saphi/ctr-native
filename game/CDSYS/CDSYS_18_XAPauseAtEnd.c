@@ -14,8 +14,30 @@ void CDSYS_XAPauseAtEnd()
 
 		if (xaPlaying != 0)
 		{
-			CDSYS_SpuGetMaxSample();
-			sdata->XA_CurrOffset = NativeAudio_GetXACurrOffset();
+			int prevOffset = sdata->XA_CurrOffset;
+			int currOffset = NativeAudio_GetXACurrOffset();
+			int firstOffset = -1;
+
+			if (currOffset < prevOffset)
+				prevOffset = currOffset;
+
+			if (sdata->XA_MaxSampleNumSaved == 0)
+			{
+				firstOffset = currOffset;
+			}
+			else if (currOffset > prevOffset)
+			{
+				firstOffset = currOffset - 2;
+				if (firstOffset < prevOffset + 1)
+					firstOffset = prevOffset + 1;
+				if (firstOffset < 0)
+					firstOffset = 0;
+			}
+
+			for (int offset = firstOffset; offset >= 0 && offset <= currOffset; offset++)
+				CDSYS_SpuGetMaxSampleAtOffset(offset);
+
+			sdata->XA_CurrOffset = currOffset;
 		}
 
 		if (sdata->XA_State == 4)
@@ -39,6 +61,8 @@ void CDSYS_XAPauseAtEnd()
 		}
 		else if (xaPlaying == 0)
 		{
+			if (sdata->XA_State != 0)
+				sdata->XA_PauseFrame = sdata->gGT->frameTimer_MainFrame_ResetDB;
 			sdata->XA_State = 0;
 			sdata->XA_MaxSampleVal = 0;
 			sdata->XA_MaxSampleValInArr = 0;

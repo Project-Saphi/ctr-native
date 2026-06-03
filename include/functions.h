@@ -29,6 +29,9 @@ void CDSYS_SpuCallbackTransfer(void);
 void CDSYS_SpuEnableIRQ(void);
 void CDSYS_SpuDisableIRQ(void);
 void CDSYS_SpuGetMaxSample(void);
+#if defined(CTR_NATIVE)
+void CDSYS_SpuGetMaxSampleAtOffset(int xaCurrOffset);
+#endif
 int CDSYS_XAGetNumTracks(int categoryID);
 int CDSYS_XAGetTrackLength(int categoryID, int xaID);
 int CDSYS_XAPlay(int categoryID, int xaID);

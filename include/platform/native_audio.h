@@ -23,6 +23,7 @@ int NativeAudio_GetXATrackLength(int categoryID, int xaID);
 int NativeAudio_IsXAPlaying(void);
 int NativeAudio_GetXACurrOffset(void);
 int NativeAudio_GetXAMaxSample(void);
+int NativeAudio_GetXAMaxSampleAtOffset(int xaCurrOffset);
 void NativeAudio_SetXAVolume(int volumeLeft, int volumeRight);
 void NativeAudio_StopXA(void);
 void NativeAudio_StepVBlank(void);

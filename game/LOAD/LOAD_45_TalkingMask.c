@@ -17,6 +17,8 @@ void LOAD_TalkingMask(int packID, int maskID)
 	MEMPACK_SwapPacks(packID);
 	MEMPACK_ClearLowMem();
 
+	sdata->PatchMem_Size = 1;
+
 	int offset = maskID * 4 + (packID - 1) * 2;
 
 	// NOTE(aalhendi): Retail queues legacy VRAM type 3 with no final callback.

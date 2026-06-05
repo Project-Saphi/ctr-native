@@ -2,6 +2,7 @@
 
 #if defined(CTR_NATIVE) && defined(CTR_INTERNAL)
 #include <platform/native_replay_scheduler.h>
+#include <platform/native_savestate.h>
 #endif
 
 void StateZero();
@@ -298,6 +299,9 @@ u32 main(void)
 
 				if (NativeReplayScheduler_BeginFrame(&replayFrameInfo) != 0)
 					return 0;
+				NativeSaveState_BeginFrame();
+				gGT = sdata->gGT;
+				gGS = sdata->gGamepads;
 			}
 #endif
 			GAMEPAD_ProcessAnyoneVars(gGS);

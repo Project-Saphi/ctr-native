@@ -25,6 +25,7 @@
 #include "psx/inline_c.h"
 #include "platform/native_log.h"
 #include "platform/native_replay_scheduler.h"
+#include "platform/native_savestate.h"
 
 #ifndef __GNUC__
 #define _Static_assert(x)
@@ -77,6 +78,7 @@ typedef enum
 #include "platform/native_platform.c"
 #include "platform/native_replay_scheduler.c"
 #include "platform/native_renderer.c"
+#include "platform/native_savestate.c"
 #include "platform/native_state.c"
 
 #ifndef CC

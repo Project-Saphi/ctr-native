@@ -7,6 +7,7 @@
 #include "platform/native_log.h"
 #include "platform/native_renderer.h"
 #include "platform/native_replay_scheduler.h"
+#include "platform/native_savestate.h"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
@@ -131,6 +132,12 @@ static void Platform_HandleKey(int key, char down)
 		case SDL_SCANCODE_F3:
 			g_cfg_bilinearFiltering ^= 1;
 			Platform_LogWarn("[CTR Native] filtering mode: %d\n", g_cfg_bilinearFiltering);
+			break;
+		case SDL_SCANCODE_F5:
+			NativeSaveState_RequestSave();
+			break;
+		case SDL_SCANCODE_F8:
+			NativeSaveState_RequestLoad();
 			break;
 		}
 	}

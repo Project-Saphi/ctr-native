@@ -2,6 +2,11 @@
 
 Use this for bug reports in internal builds.
 
+## Quick State
+
+- `F5`: save `debug/states/quick.ctrstates`
+- `F8`: load `debug/states/quick.ctrstates`
+
 ## Record
 
 ```sh

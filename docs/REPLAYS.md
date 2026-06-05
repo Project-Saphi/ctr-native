@@ -38,6 +38,5 @@ Use the command written in that folder's `metadata.txt`.
 It looks like:
 
 ```sh
-build/ctr_native --replay "debug/reports/20260605/ctr-123456/recording.ctrreplay"
+build/ctr_native --replay "debug/reports/20260605/ctr-123456/input.ctrreplay"
 ```
-

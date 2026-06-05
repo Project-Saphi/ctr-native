@@ -33,7 +33,8 @@
 #define NATIVE_REPLAY_BUILD_ID_BYTES             64u
 #define NATIVE_REPLAY_PLATFORM_ID_BYTES          32u
 #define NATIVE_REPLAY_DEFAULT_REPORT_ROOT        "debug/reports"
-#define NATIVE_REPLAY_REPORT_REPLAY_NAME         "recording.ctrreplay"
+#define NATIVE_REPLAY_REPORT_REPLAY_NAME         "input.ctrreplay"
+#define NATIVE_REPLAY_REPORT_CHECKPOINT_NAME     "state.ctrstates"
 #define NATIVE_REPLAY_REPORT_METADATA_NAME       "metadata.txt"
 #define NATIVE_REPLAY_REPORT_LOG_NAME            "ctr-native.log"
 
@@ -313,41 +314,34 @@ static s32 NativeReplayScheduler_ArgMissingValue(int argc, char **argv, const ch
 	return 0;
 }
 
-static char *NativeReplayScheduler_MakeSidecarPath(const char *path, const char *extension)
+static char *NativeReplayScheduler_MakeSiblingPath(const char *path, const char *filename)
 {
 	const char *lastSlash;
 	const char *lastBackslash;
 	const char *lastSeparator;
-	const char *lastDot;
-	size_t pathLen;
-	size_t stemLen;
-	size_t extensionLen;
-	char *sidecarPath;
+	size_t dirLen;
+	size_t filenameLen;
+	char *siblingPath;
 
-	if ((path == NULL) || (extension == NULL))
+	if ((path == NULL) || (filename == NULL))
 		return NULL;
 
-	pathLen = strlen(path);
-	extensionLen = strlen(extension);
 	lastSlash = strrchr(path, '/');
 	lastBackslash = strrchr(path, '\\');
 	lastSeparator = lastSlash;
 	if ((lastSeparator == NULL) || ((lastBackslash != NULL) && (lastBackslash > lastSeparator)))
 		lastSeparator = lastBackslash;
 
-	lastDot = strrchr(path, '.');
-	if ((lastDot != NULL) && ((lastSeparator == NULL) || (lastDot > lastSeparator)))
-		stemLen = (size_t)(lastDot - path);
-	else
-		stemLen = pathLen;
+	dirLen = (lastSeparator != NULL) ? (size_t)(lastSeparator - path + 1) : 0u;
+	filenameLen = strlen(filename);
 
-	sidecarPath = (char *)malloc(stemLen + extensionLen + 1);
-	if (sidecarPath == NULL)
+	siblingPath = (char *)malloc(dirLen + filenameLen + 1u);
+	if (siblingPath == NULL)
 		return NULL;
 
-	memcpy(sidecarPath, path, stemLen);
-	memcpy(&sidecarPath[stemLen], extension, extensionLen + 1);
-	return sidecarPath;
+	memcpy(siblingPath, path, dirLen);
+	memcpy(&siblingPath[dirLen], filename, filenameLen + 1u);
+	return siblingPath;
 }
 
 static s32 NativeReplayScheduler_FileExists(const char *path)
@@ -548,7 +542,7 @@ static s32 NativeReplayScheduler_PrepareReportPaths(const char *root)
 		goto fail;
 
 	s_reportReplayPath = NativeReplayScheduler_JoinPath(s_reportDir, NATIVE_REPLAY_REPORT_REPLAY_NAME);
-	s_reportCheckpointPath = NativeReplayScheduler_MakeSidecarPath(s_reportReplayPath, ".ctrstates");
+	s_reportCheckpointPath = NativeReplayScheduler_JoinPath(s_reportDir, NATIVE_REPLAY_REPORT_CHECKPOINT_NAME);
 	s_reportMetadataPath = NativeReplayScheduler_JoinPath(s_reportDir, NATIVE_REPLAY_REPORT_METADATA_NAME);
 	s_reportLogPath = NativeReplayScheduler_JoinPath(s_reportDir, NATIVE_REPLAY_REPORT_LOG_NAME);
 	if ((s_reportReplayPath == NULL) || (s_reportCheckpointPath == NULL) || (s_reportMetadataPath == NULL) || (s_reportLogPath == NULL))
@@ -707,9 +701,9 @@ static void NativeReplayScheduler_CloseFiles(void)
 	s_mode = NATIVE_REPLAY_MODE_NONE;
 }
 
-static s32 NativeReplayScheduler_OpenCheckpointRecord(const char *replayPath)
+static s32 NativeReplayScheduler_OpenCheckpointRecord(const char *checkpointPath)
 {
-	s_checkpointPath = NativeReplayScheduler_MakeSidecarPath(replayPath, ".ctrstates");
+	s_checkpointPath = NativeReplayScheduler_DupString(checkpointPath);
 	if (s_checkpointPath == NULL)
 	{
 		Platform_Log("[CTR State] failed to build checkpoint path\n");
@@ -781,7 +775,7 @@ static s32 NativeReplayScheduler_WriteCheckpointIfDue(void)
 
 static s32 NativeReplayScheduler_PrepareBootstrapCheckpoint(const char *replayPath)
 {
-	char *checkpointPath = NativeReplayScheduler_MakeSidecarPath(replayPath, ".ctrstates");
+	char *checkpointPath = NativeReplayScheduler_MakeSiblingPath(replayPath, NATIVE_REPLAY_REPORT_CHECKPOINT_NAME);
 	int recordCount = 0;
 
 	if (checkpointPath == NULL)
@@ -872,19 +866,19 @@ cleanup:
 	return ok;
 }
 
-static s32 NativeReplayScheduler_OpenRecord(const char *path)
+static s32 NativeReplayScheduler_OpenRecord(const char *replayPath, const char *checkpointPath)
 {
 	NativeReplayScheduler_InitHeader(&s_header);
-	s_file = fopen(path, "wb+");
+	s_file = fopen(replayPath, "wb+");
 	if (s_file == NULL)
 	{
-		Platform_Log("[CTR Replay] failed to open replay for record: %s\n", path);
+		Platform_Log("[CTR Replay] failed to open replay for record: %s\n", replayPath);
 		return 0;
 	}
 
 	if (fwrite(&s_header, sizeof(s_header), 1, s_file) != 1)
 	{
-		Platform_Log("[CTR Replay] failed to write replay header: %s\n", path);
+		Platform_Log("[CTR Replay] failed to write replay header: %s\n", replayPath);
 		NativeReplayScheduler_CloseFiles();
 		return 0;
 	}
@@ -892,15 +886,15 @@ static s32 NativeReplayScheduler_OpenRecord(const char *path)
 
 	s_mode = NATIVE_REPLAY_MODE_RECORD;
 	NativeAudio_SetDeterministicRenderMode(1);
-	if (!NativeReplayScheduler_OpenCheckpointRecord(path))
+	if (!NativeReplayScheduler_OpenCheckpointRecord(checkpointPath))
 	{
 		NativeReplayScheduler_CloseFiles();
-		remove(path);
+		remove(replayPath);
 		return 0;
 	}
 
 	NativeReplayScheduler_WriteReportMetadata(0);
-	Platform_Log("[CTR Replay] recording input replay: %s\n", path);
+	Platform_Log("[CTR Replay] recording input replay: %s\n", replayPath);
 	return 1;
 }
 
@@ -930,7 +924,7 @@ static s32 NativeReplayScheduler_StartReportRecording(void)
 	}
 
 	NativeReplayScheduler_ResetSessionState();
-	if (!NativeReplayScheduler_OpenRecord(s_reportReplayPath))
+	if (!NativeReplayScheduler_OpenRecord(s_reportReplayPath, s_reportCheckpointPath))
 		return 0;
 
 	Platform_Log("[CTR Replay] report recording started\n");
@@ -1053,7 +1047,7 @@ int NativeReplayScheduler_ConfigureFromArgs(int argc, char **argv)
 	if (recordReport != 0)
 	{
 		if (toggle == 0)
-			return NativeReplayScheduler_OpenRecord(s_reportReplayPath) ? 0 : 1;
+			return NativeReplayScheduler_OpenRecord(s_reportReplayPath, s_reportCheckpointPath) ? 0 : 1;
 
 		return NativeReplayScheduler_ArmReport() ? 0 : 1;
 	}

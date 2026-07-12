@@ -178,7 +178,14 @@ LAB_800aec34:
 
 		    sdata->lngStrings[data.lng_challenge[R232.bossIDs[hubID]]],
 
-		    (view.x + view.w >> 1), ((view.y + view.h) - 0x1e), 1, 0xffff8000);
+		    // NOTE(claude): Ghidra 0x800aed10-18 (`sll rect.w,0x10; sra 0x11; addu rect.x,...`)
+		    // computes the horizontal center as rect.x + (rect.w >> 1), i.e. x + w/2. The prior
+		    // `(view.x + view.w >> 1)` binds as (x + w) >> 1 (C: + before >>) = (x+w)/2, which only
+		    // equals x + w/2 when x == 0. Every sibling centers correctly (232_04:144
+		    // `rect.x + rect.w/2`, UI_RaceFlow.c:197 `rect.x + ((rect.w<<0x10)>>0x11)`), so this was
+		    // a missing-parens typo. Harmless here (adventure hub is 1P, rect.x==0) but wrong for any
+		    // non-zero viewport origin; parenthesize to match retail.
+		    (view.x + (view.w >> 1)), ((view.y + view.h) - 0x1e), 1, 0xffff8000);
 	}
 
 	if (bossIsOpen)

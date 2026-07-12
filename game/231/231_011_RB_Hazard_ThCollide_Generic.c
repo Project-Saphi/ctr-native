@@ -26,11 +26,21 @@ void RB_Hazard_ThCollide_Generic(struct Thread *thread)
 		// "thread", or else you'll kill the wrong thread
 		// at the end of the function
 
-		crateObj = (struct Crate *)crateInst->thread->object;
+		// NOTE(claude): Ghidra 0x800ac4f8/0x800ac500 — retail guards
+		// crateInst->thread != 0 before reading ->object (a three-level
+		// null check). The prior code dereferenced crateInst->thread->object
+		// unconditionally; on native a NULL crate thread faults at (NULL+0x30)
+		// where retail safely skips. Restore the middle null check.
+		crateThread = crateInst->thread;
 
-		if (crateObj != 0)
+		if (crateThread != 0)
 		{
-			crateObj->boolPauseCooldown = 0;
+			crateObj = (struct Crate *)crateThread->object;
+
+			if (crateObj != 0)
+			{
+				crateObj->boolPauseCooldown = 0;
+			}
 		}
 	}
 

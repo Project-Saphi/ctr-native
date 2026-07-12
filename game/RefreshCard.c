@@ -134,7 +134,10 @@ void RefreshCard_GhostEncodeProfile(u32 slotIndex, u16 characterID, u16 levelID,
 
 	strcat(&description[strlen(description)], sdata->lngStrings[data.metaDataLEV[(s16)levelID].name_LNG]);
 	strcat(description, sdata->strcatData1_colon);
-	strcat(&description[strlen(description)], sdata->lngStrings[data.MetaDataCharacters[(s16)characterID].name_LNG_long]);
+	// NOTE(claude): Ghidra 0x80046e24 lh 0x6(v1), stride 0x10 — retail reads the
+	// +6 field (name_LNG_short, "Crash"), not +4 (name_LNG_long, "Crash
+	// Bandicoot"), for the ghost-save description.
+	strcat(&description[strlen(description)], sdata->lngStrings[data.MetaDataCharacters[(s16)characterID].name_LNG_short]);
 	strcat(description, sdata->strcatData1_colon);
 	strcat(description, (char *)RECTMENU_DrawTime(time));
 
@@ -351,10 +354,16 @@ void RefreshCard_Unknown3(void)
 			{
 				int remaining;
 
-				memcpy(data.s_BASCUS_94426G_Question, sdata->ghostProfile_memcard[sdata->ghostProfile_rowSelect].profile_name,
-				       sizeof(data.s_BASCUS_94426G_Question));
+				// NOTE(claude): Ghidra (Unknown3 case 6, stores to DAT_80099284)
+				// — retail copies the doomed
+				// file's name (0x15 bytes) into the SEPARATE buffer at
+				// 0x80099284 (ghostFileNameFinal), NOT into the
+				// s_BASCUS_94426G template; clobbering the template made the
+				// follow-up ghost save (QueueGhostSave after READY_SAVE)
+				// write the new ghost under the erased file's name.
+				memcpy(sdata->ghostFileNameFinal, sdata->ghostProfile_memcard[sdata->ghostProfile_rowSelect].profile_name, 0x15);
 				RefreshCard_SetScreenText(MC_SCREEN_SAVING);
-				RefreshCard_NextMemcardAction(0, MC_ACTION_Erase, data.s_BASCUS_94426G_Question, NULL, NULL, 0);
+				RefreshCard_NextMemcardAction(0, MC_ACTION_Erase, sdata->ghostFileNameFinal, NULL, NULL, 0);
 				sdata->boolError = 0;
 
 				remaining = (sdata->numGhostProfilesSaved - 1) - sdata->ghostProfile_rowSelect;
@@ -396,7 +405,13 @@ void RefreshCard_Unknown3(void)
 
 	if (RefreshCard_GetResult(MC_RESULT_FULL) != 0)
 	{
-		RefreshCard_Unknown2();
+		// NOTE(claude): Ghidra 0x80047610 `bne v0,zero,0x800476b4` — retail's
+		// card-FULL branch jumps STRAIGHT to SetScreenText(MC_SCREEN_ERROR_FULL)
+		// with NO RefreshCard_Unknown2() call (unlike the NOCARD/TIMEOUT/
+		// UNFORMATTED paths, which each `jal 0x800471e8`). The extra Unknown2()
+		// here re-ran GAMEPROG_InitFullMemcard + reset the refresh handshake
+		// (RefreshFlag=1/RefreshState=0) on a full card, which retail never does.
+		// Removed to match the binary.
 		RefreshCard_SetScreenAndPoll(MC_SCREEN_ERROR_FULL);
 		keepPolling = 0;
 		goto done;
@@ -418,7 +433,10 @@ void RefreshCard_Unknown3(void)
 
 		if ((sdata->memcardAction >= 0) && (sdata->memcardAction < 3))
 		{
-			RefreshCard_SetScreenText(MC_SCREEN_ERROR_NODATA);
+			// NOTE(claude): Ghidra 0x80047950 — retail's comma-op assignment
+			// (MVar4 = MC_SCREEN_NULL, 2 < mode) means only mode 0 shows the
+			// NODATA text; modes 1-2 fall through with MC_SCREEN_NULL.
+			RefreshCard_SetScreenText((sdata->memcardAction == 0) ? MC_SCREEN_ERROR_NODATA : MC_SCREEN_NULL);
 			RefreshCard_QueueGetInfo();
 			keepPolling = 0;
 		}

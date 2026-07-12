@@ -488,7 +488,11 @@ void BOTS_SetRotation(struct Driver *bot, int useSpawnYaw)
 		bot->botData.estimateRotNav[0] = nf->rot[0];
 		rot = ratan2(CTR_MipsNegLo(dx), CTR_MipsNegLo(dz));
 		bot->botData.estimateRotNav[1] = (u8)CTR_MipsSra(CTR_MipsAddLo(rot, 0x800), 4);
-		bot->botData.estimateRotNav[2] = nf->rot[1];
+		// NOTE(claude): Ghidra 0x80013578/0x80013580 `lbu v0,0x8(s6); sb v0,0x614(s4)` — estimateRotNav[2]
+		// (roll/z) copies NavFrame->rot[2] (byte @NavFrame+0x8), not rot[1] (@+0x7). rot is u8[4]@6, so
+		// reading rot[1] fed the nav *yaw* byte into the roll estimate — wrong bot banking on inclined
+		// nav frames. Fixed to rot[2] to match retail.
+		bot->botData.estimateRotNav[2] = nf->rot[2];
 	}
 	else
 	{
@@ -1648,7 +1652,14 @@ UpdateTireColorTimer:
 		botInstance->alphaScale = (s16)CTR_MipsSra(CTR_MipsAddLo(CTR_MipsMulLo((u16)botInstance->alphaScale, 100), transparency), 8);
 	}
 
-	if (((botDriver->actionsFlagSet & ACTION_FRONT_SKID) == 0) || ((navActionFlags & (ACTION_BACK_SKID | ACTION_FRONT_SKID)) == 0))
+	// NOTE(claude): Ghidra 0x80015240 `lw t3,0x6c(sp); andi v0,t3,0x1800` — the 2nd gate tests the RAW
+	// navFrameFlags accumulator & DRIFT_MASK (BOTS_NAV_FLAG_DRIFT_LEFT 0x800 | DRIFT_RIGHT 0x1000 = 0x1800),
+	// i.e. "is the AI on a drift nav segment?". Numeric coincidence: ACTION_BACK_SKID(0x800)|ACTION_FRONT_SKID(0x1000)
+	// == 0x1800 too, so `navActionFlags & (BACK|FRONT_SKID)` compiled fine but is the WRONG word. Because the 1st
+	// gate (actionsFlagSet & ACTION_FRONT_SKID) already implies navActionFlags has ACTION_FRONT_SKID, that check was
+	// always-true when reached → drift requirement bypassed, bots charged turbo on any front-skid segment. Test the
+	// raw nav flags & DRIFT_MASK to match retail.
+	if (((botDriver->actionsFlagSet & ACTION_FRONT_SKID) == 0) || ((navFrameFlags & BOTS_NAV_FLAG_DRIFT_MASK) == 0))
 	{
 		botDriver->turbo_MeterRoomLeft = 0;
 		botDriver->botData.aiPhysics.turboMeter = 0;
@@ -2420,6 +2431,15 @@ UpdateTireColorTimer:
 				goto badEffectKartWiggle;
 			}
 		}
+		// NOTE(claude): Ghidra asm 0x80016488 `bne s0,zero,0x800164a8` — when clockReceive==0
+		// but squishTimer!=0, retail STILL applies the kart wiggle (phase = squishTimer). The
+		// prior nested-if (label only in the else) skipped the wiggle in that case, so a
+		// squished-but-not-clocked kart lost its shake. Match retail: fall through to the wiggle
+		// with badnessRecieveTimer already holding squishTimer.
+		else
+		{
+			goto badEffectKartWiggle;
+		}
 	}
 	else
 	{
@@ -2796,8 +2816,21 @@ u32 BOTS_ChangeState(struct Driver *driverVictim, int damageType, struct Driver 
 
 	if (driverAttacker != NULL && damageType != 0)
 	{
-		driverAttacker->numTimesAttacked++;
-		switch (damageType)
+		// NOTE(claude): Ghidra asm 0x80016e28 `lbu v0,0x559(s1); addiu +1; sb v0,0x559(s1)` — the
+		// always-increment counter is numTimesAttacking (char @0x559, the attacker's "times I
+		// attacked someone" stat), NOT numTimesAttacked (int @0x57c, an EndOfRace-quip field).
+		// The two names differ by one letter; the project incremented the wrong field, leaving
+		// numTimesAttacking stuck at 0 (breaks the attack-count quips/stats fed by it).
+		driverAttacker->numTimesAttacking++;
+		// NOTE(claude): Ghidra 0x80016e20/0x80016e38 — the `!= 0` gate reads a1 (param2 damageType),
+		// but the weapon-hit switch reads a3 (param4 `reason`): `beq s3,3 → missile(+0x557)`,
+		// `beq s3,1 → bomb(+0x55a)`, `beq s3,4 → potion(+0x556)`. Project switched on `damageType`,
+		// the physics reaction (0=none/1=spinout/2=blast/3=squish/4=burn/5=maskgrab), not the weapon.
+		// These differ: a missile arrives as damageType=1 (spinout) reason=3 (missile) — so it was
+		// miscredited as a bomb hit; a bomb (damageType=2 blast, reason=1) credited nothing. Callers
+		// (BOTS.c:811, RB_Hazard_HurtDriver:19, which even rewrites damageType independently) pass the
+		// two as distinct fields (pendingDamageType vs pendingDamageReasonByte). Switch on `reason`.
+		switch (reason)
 		{
 		case 1:
 			driverAttacker->numTimesBombsHitSomeone++;

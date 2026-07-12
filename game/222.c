@@ -418,14 +418,13 @@ void AA_EndEvent_DrawMenu(void)
 
 	RECTMENU_ClearInput();
 
-	sdata->Loading.OnBegin.AddBitsConfig0 |= ADVENTURE_ARENA;
-	sdata->Loading.OnBegin.RemBitsConfig0 |= ADVENTURE_BOSS;
-	sdata->Loading.OnBegin.RemBitsConfig8 |= TOKEN_RACE;
-
-	if (IS_BOSS_RACE(gGT->gameMode1))
-	{
-		sdata->Loading.OnBegin.AddBitsConfig8 |= SPAWN_AT_BOSS;
-	}
+	// NOTE(claude): Ghidra 0x800a03b8-0x800a0648 — retail sets the Loading.OnBegin
+	// configs ONLY in the confirmed-WIN path (after the tap), split across the boss
+	// vs normal branches; the LOSE path (0x800a0658) sets NO configs — it just shows
+	// the retry/exit menu. The prior code set them here, before the win/lose split,
+	// so a LOST adventure race queued gameMode changes (remove ADVENTURE_BOSS/TOKEN_RACE,
+	// add ADVENTURE_ARENA) that persist into Retry (UI_RaceEnd_MenuProc case 4/RESTART
+	// clears none of them). Moved into the win path below to match the binary.
 
 	if (!didWin)
 	{
@@ -439,11 +438,18 @@ void AA_EndEvent_DrawMenu(void)
 	sdata->framesSinceRaceEnded = 0;
 	sdata->numIconsEOR = 1;
 
+	// NOTE(claude): Ghidra 0x800a041c — set in the win path, before the boss/normal split.
+	sdata->Loading.OnBegin.AddBitsConfig0 |= ADVENTURE_ARENA;
+
 	// Load the levelID for Adventure Hub that you came from
 	s16 levSpawn = gGT->prevLEV;
 
 	if (IS_BOSS_RACE(gGT->gameMode1))
 	{
+		// NOTE(claude): Ghidra 0x800a0440/0x800a0454 — boss-win only.
+		sdata->Loading.OnBegin.AddBitsConfig8 |= SPAWN_AT_BOSS;
+		sdata->Loading.OnBegin.RemBitsConfig0 |= ADVENTURE_BOSS;
+
 		// Reward bit of key unlocked, and boss beaten.
 		rewardBit = gGT->bossID + ADV_REWARD_FIRST_BOSS_KEY;
 
@@ -504,6 +510,9 @@ void AA_EndEvent_DrawMenu(void)
 		// go to podium with trophy
 		gGT->podiumRewardID = STATIC_TROPHY;
 	}
+
+	// NOTE(claude): Ghidra 0x800a063c — normal-win only, right before the final load.
+	sdata->Loading.OnBegin.RemBitsConfig8 |= TOKEN_RACE;
 
 	MainRaceTrack_RequestLoad(levSpawn);
 }

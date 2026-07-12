@@ -7,7 +7,10 @@ int DecalFont_GetLineWidthStrlen(char *character, int len, int fontType)
 	s16 font_buttonPixWidth;
 	s16 font_puncPixWidth;
 	int pixLength;
-	char c;
+	// NOTE(claude): Ghidra 0x8002248c does `andi v1,a3,0xff; sltiu v0,v1,0x3` — the
+	// "normal character" width test is UNSIGNED. A signed char made bytes >= 0x80
+	// measure zero width while DrawLineStrlen still renders them.
+	u8 c;
 #if BUILD == JpnRetail
 	u32 isRacingWheel;
 #endif

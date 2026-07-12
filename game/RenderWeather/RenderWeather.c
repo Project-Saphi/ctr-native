@@ -107,6 +107,7 @@ void RenderWeather(struct PushBuffer *pb, struct PrimMem *primMem, struct RainBu
 	u32 *scratchPackedCenterXY = CTR_SCRATCHPAD_PTR(u32, 0x38);
 	u32 *scratchCenterZ = CTR_SCRATCHPAD_PTR(u32, 0x3c);
 	struct RenderWeatherTrigPair trig;
+	u32 centerX;
 	u32 screenBounds;
 	u_long *ot;
 	s32 currentParticles;
@@ -152,7 +153,15 @@ void RenderWeather(struct PushBuffer *pb, struct PrimMem *primMem, struct RainBu
 	CTC2(RenderWeather_ReadWord(&pb->matrix_ViewProj, 0x10), 4);
 
 	trig = RenderWeather_TrigAngleSinCos(pb->rot.y);
-	*scratchPackedCenterXY = 0x04000000u | (u32)((trig.sin >> 2) + 0x400);
+	// NOTE(claude): Ghidra 0x8006fb64/0x8006fb68 add the *bare* centerX (s1 =
+	// (sin>>2)+0x400) into startXY/endXY, not the packed scratch-0x38 value which
+	// also carries the 0x04000000 packing bit. The packed value is only used for
+	// the loop's scratch-0x38 subtract (0x8006fbcc/0x8006fbe0). Adding the packed
+	// value here shifted every rain streak by +0x400 in pre-projection Y (bit 26
+	// survives the 0xfffeffff/0x07fe07ff masks and doesn't cancel the subtract) and
+	// changed which streaks the wrap-detection culled. Use the bare centerX.
+	centerX = (u32)((trig.sin >> 2) + 0x400);
+	*scratchPackedCenterXY = 0x04000000u | centerX;
 	*scratchCenterZ = (u32)((trig.cos >> 2) + 0x400);
 
 	screenBounds = RenderWeather_ReadWord(pb, 0x20);
@@ -221,9 +230,9 @@ void RenderWeather(struct PushBuffer *pb, struct PrimMem *primMem, struct RainBu
 	smoothedCameraXY = (cameraXY - cameraCorrectionXY) & RENDER_WEATHER_XY_MASK;
 	smoothedCameraZ = cameraZ - ((cameraZ - prevCameraZ) >> 3);
 
-	startXY = ((scrollXYStart - smoothedCameraXY) & RENDER_WEATHER_XY_MASK) + *scratchPackedCenterXY;
+	startXY = ((scrollXYStart - smoothedCameraXY) & RENDER_WEATHER_XY_MASK) + centerX;
 	startXY &= RENDER_WEATHER_XY_MASK;
-	endXY = ((scrollXYEnd - cameraXY) & RENDER_WEATHER_XY_MASK) + *scratchPackedCenterXY;
+	endXY = ((scrollXYEnd - cameraXY) & RENDER_WEATHER_XY_MASK) + centerX;
 	endXY &= RENDER_WEATHER_XY_MASK;
 	startZ = (scrollZStart - smoothedCameraZ) + (s32)*scratchCenterZ;
 	endZ = (scrollZEnd - cameraZ) + (s32)*scratchCenterZ;

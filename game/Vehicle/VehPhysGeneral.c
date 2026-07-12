@@ -947,17 +947,22 @@ void VehPhysGeneral_SetHeldItem(struct Driver *driver)
 			// 1P Arcade
 			case 8:
 
-				// 0,1 = 0 (itemset1)
-				// 2,3 = 1 (itemset2)
-				// 4,5 = 2 (itemset3)
-				// 6,7 = 3 (itemset4)
-				itemSet = CTR_MipsSra(CTR_MipsAddLo(driver->driverRank, (u32)driver->driverRank >> 31), 1);
-
-				// if in 2nd place, get itemSet2
-				if (itemSet == 1)
+				// NOTE(claude): Ghidra 0x80060f9c-0x80060fc0 — case 8 tests the raw
+				// driverRank against 1 (beq v1,1 at 0x80060fb0, where v1=sra a0,0x10 is the
+				// un-halved rank) and only halves it (sra s0,v0,1) in the else path. So
+				// rank 1 (2nd place) is special-cased to itemSet2, while rank/2 is used
+				// otherwise. The old code halved first, then tested the halved value == 1
+				// (never true for rank 1, which halves to 0), so 2nd place wrongly got the
+				// 1st-place itemset (Race1) instead of Race2.
+				// rank: 0 = 0 (itemset1); 1,2,3 = 1 (itemset2); 4,5 = 2 (itemset3); 6,7 = 3 (itemset4)
+				if (driver->driverRank == 1)
 				{
 				Itemset2:
 					itemSet = ITEMSET_Race2;
+				}
+				else
+				{
+					itemSet = CTR_MipsSra(CTR_MipsAddLo(driver->driverRank, (u32)driver->driverRank >> 31), 1);
 				}
 			}
 		}

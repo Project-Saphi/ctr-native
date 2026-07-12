@@ -51,6 +51,10 @@ void RB_GenericMine_LInB(struct Instance *inst)
 	mw->velocity.z = 0;
 	mw->boolDestroyed = 0;
 	mw->frameCount_DontHurtParent = 0;
+	// NOTE(claude): Ghidra 0x800acb2c `sh zero,0x26(s0)` — retail zeroes tntSpinY
+	// here too. The pooled MineWeapon is not auto-zeroed (every other field is
+	// explicitly cleared), so the prior code left tntSpinY holding recycled garbage.
+	mw->tntSpinY = 0;
 	mw->extraFlags = 0;
 	mw->stopFallAtY = inst->matrix.t[1];
 

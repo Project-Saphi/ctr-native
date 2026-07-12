@@ -153,6 +153,15 @@ LAB_800ad5f8:
 		t->flags |= THREAD_FLAG_DEAD;
 
 		mw->driverTarget->instTntRecv = NULL;
+
+		// NOTE(claude): Ghidra 0x800ad6b0 — this explode path ends via ThTick_FastRET
+		// (0x80071694, the scheduler trampoline that restores saved sp/ra/s0-s8 and never
+		// returns to this frame), so the scale-from-table below is NOT reached in retail
+		// (unlike the < 0x5a path, which falls into it). The value written happens to match
+		// (numFramesOnHead == 0x5a both before and at the explode frame), so this is
+		// behaviourally benign, but returning here matches the binary and avoids indexing
+		// s_tntSitScale out of bounds should numFramesOnHead ever exceed 0x5a.
+		return;
 	}
 
 	// set scale of TNT, given frame of animation

@@ -7,7 +7,13 @@ void MM_Video_KickCD(CdlLOC *location)
 	int CdlMode;
 	u8 mode[4];
 
-	if ((location != NULL) && (V230.ptrCdLoc != &V230.cdLocation2))
+	// NOTE(claude): Ghidra 0x800b5b9c-0x800b5ba0 `addiu v0,0x6824; beq v1,v0` — the
+	// sentinel is &cdLocation1 (0x800b6824), the address StartStream seeds and points
+	// ptrCdLoc at. The prior &cdLocation2 (0x800b6828) is a distinct offset, so this
+	// guard would wrongly fire on the restart KickCD(&field@0x682c) call while
+	// ptrCdLoc still == &cdLocation1, resetting the CD state machine (field12_0x20=0)
+	// instead of continuing it. Compare against cdLocation1 to match the binary.
+	if ((location != NULL) && (V230.ptrCdLoc != &V230.cdLocation1))
 	{
 		V230.field12_0x20 = 0;
 		V230.ptrCdLoc = location;

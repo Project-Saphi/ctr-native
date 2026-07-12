@@ -223,13 +223,16 @@ struct GamepadBuffer
 
 	// 0x3C
 	int shockValFreq;
-	char shockValForce1;
-	char shockValForce2;
+	// NOTE(claude): retail reads these four with lbu (zero-extend) for its
+	// priority/pulse compares (Ghidra 0x800264c0/0x80026540/0x80025e18); signed
+	// char flipped the compares for values >= 0x80.
+	u8 shockValForce1;
+	u8 shockValForce2;
 
 	// ==== JogCon ====
 
-	char unk42;
-	char unk43;
+	u8 unk42;
+	u8 unk43;
 
 	// 0x44
 	char unk44; // 2A

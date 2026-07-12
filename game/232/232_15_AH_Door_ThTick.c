@@ -32,6 +32,7 @@ void AH_Door_ThTick(struct Thread *t)
 	int i;
 	int ratio;
 	int distX;
+	int distY;
 	int distZ;
 	int dist;
 	int iVar17;
@@ -65,6 +66,14 @@ void AH_Door_ThTick(struct Thread *t)
 	// X distance of player and door
 	distX = doorInst->matrix.t[0] + (ratio * 0x300 >> 0xc) - driver->instSelf->matrix.t[0];
 
+	// NOTE(claude): Ghidra 0x800afbd4/0x800afc04/0x800afc18/0x800afc50-58 — retail includes the raw
+	// Y term (doorInst.t[1] - driverInst.t[1]) in the squared distance: dist = dX² + dY² + dZ². The
+	// prior code summed only dX² + dZ², so any vertical offset between the car and the door origin
+	// shifted the effective trigger radius (dist gates the 0x90000 open-collision toggle and the
+	// 0x8ffff far cut-off). Include the Y term to match retail.
+	// Y distance of player and door (raw, no facing-axis offset)
+	distY = doorInst->matrix.t[1] - driver->instSelf->matrix.t[1];
+
 	// Sine(angle)
 	ratio = MATH_Sin((int)doorInst->instDef->rot.y);
 
@@ -72,7 +81,7 @@ void AH_Door_ThTick(struct Thread *t)
 	distZ = doorInst->matrix.t[2] + (ratio * 0x300 >> 0xc) - driver->instSelf->matrix.t[2];
 
 	// distance from player and door
-	dist = distX * distX + distZ * distZ;
+	dist = distX * distX + distY * distY + distZ * distZ;
 
 	// If player is close to a door
 	if (dist < 0x90000)

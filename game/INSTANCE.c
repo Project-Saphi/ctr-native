@@ -88,6 +88,15 @@ struct Instance *INSTANCE_Birth2D(struct Model *model, const char *name, struct 
 	{
 		INSTANCE_Birth(inst, model, name, th, 0x40f);
 	}
+#ifdef CTR_NATIVE
+	// NOTE(claude): Ghidra 0x800308e4 — retail performs the idpp writes below
+	// even when the pool returns NULL (a write into PS1 low RAM); the host
+	// cannot. Guard matches INSTANCE_Birth's null-name convention.
+	else
+	{
+		return inst;
+	}
+#endif
 
 	idpp = INST_GETIDPP(inst);
 	idpp[0].pushBuffer = &gGT->pushBuffer_UI;
@@ -303,29 +312,35 @@ void INSTANCE_LevInitAll(struct InstDef *levInstDef, int numInst)
 
 		int boolRelicOnly = ((((u32)modelID - STATIC_TIME_CRATE_02) < 2) || (modelID == STATIC_TIME_CRATE_01));
 
-		if ((gGT->gameMode1 & TIME_TRIAL) != 0)
-		{
-			if (boolArcadeOnly || boolRelicOnly)
-			{
-				inst->flags &= ~DRAW_COLLISION_MASK;
-			}
-		}
+		// NOTE(claude): Ghidra asm 0x80030d0c-0x80030e2c — retail runs TWO
+		// independent sequential filters here, not one else-if chain:
+		// Filter A (TT/relic/time-crates) always falls through (`j 0x80030dac`)
+		// into Filter B (crystal/TNT/nitro), so e.g. time trial ALSO hides
+		// explosives and arcade/adventure ALSO hide time crates. The relic
+		// time-crate path (0x80030d3c) only counts — it has no `flags |= 1`.
 
+		// Filter A: time-trial / relic-race objects
+		if (((gGT->gameMode1 & TIME_TRIAL) != 0) && (boolArcadeOnly || boolRelicOnly))
+		{
+			inst->flags &= ~DRAW_COLLISION_MASK;
+		}
 		else if ((gGT->gameMode1 & RELIC_RACE) != 0)
 		{
-			if (boolArcadeOnly)
-				inst->flags &= ~DRAW_COLLISION_MASK;
-
 			if (boolRelicOnly)
-			{
 				gGT->timeCratesInLEV++;
 
-				// temporary, until timebox thread is ready
-				inst->flags |= 1;
-			}
+			else if (boolArcadeOnly)
+				inst->flags &= ~DRAW_COLLISION_MASK;
+		}
+		else
+		{
+			// any other mode: hide relic time crates
+			if (boolRelicOnly)
+				inst->flags &= ~DRAW_COLLISION_MASK;
 		}
 
-		else if ((gGT->gameMode1 & CRYSTAL_CHALLENGE) != 0)
+		// Filter B: crystal-challenge objects (unconditional second pass)
+		if ((gGT->gameMode1 & CRYSTAL_CHALLENGE) != 0)
 		{
 			if (modelID == STATIC_CRYSTAL)
 				gGT->numCrystalsInLEV++;

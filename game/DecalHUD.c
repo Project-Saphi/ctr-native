@@ -51,8 +51,10 @@ void DecalHUD_DrawWeapon(struct Icon *icon, s16 posX, s16 posY, struct PrimMem *
 	// instead of psn00bsdk's setXY4, this function uses a custom-made macro that resembles the compiler optimization used in the original code
 	// the X and Y fields of the primitive will be dereferenced as combined 32-bit integers for each vertex
 	// from this, the X and Y coordinates will be added onto these integers using bitwise OR
-	// this originally caused a bug where if X is higher than 0xFFFF (by not being cast as unsigned 16-bits) it will overflow onto Y
-	// for the sake of making this compile under the original file size of the function (0x190 bytes) this macro will be used with the proper variable casts
+	// NOTE(claude): Ghidra 0x80022f88-0x80023020 — retail DrawWeapon has NO andi
+	// masks here (unlike DrawPolyGT4, which masks base posX): a negative/overflowing
+	// X corrupts the packed Y on retail. The (u16) casts below are a deliberate
+	// port-side fix of that retail bug, not a reproduction of original codegen.
 	if (!(rot & 1))
 	{
 		if (rot == 0)
@@ -175,11 +177,16 @@ void DecalHUD_Arrow2D(struct Icon *icon, s16 posX, s16 posY, struct PrimMem *pri
 	*(int *)&p->u0 = topLeftCornerAndPaletteXY;
 	*(s16 *)&p->u2 = (s16)bottomMargin;
 
-	bitshiftPosY = (int)(((u32)y2 - ((int)topLeftCornerAndPaletteXY >> 8 & 0xffU)) * (int)scale) >> 0xd;
+	// NOTE(claude): Ghidra 0x800231cc-0x800231d0 `sll a0,a0,0x10; sra a0,a0,0x10` — retail truncates
+	// `scale` to s16 (sign-extend low 16 bits) ONCE, then reuses it in both mult v1,a0. `int scale`
+	// here skipped that truncation, so a caller passing scale>=0x8000 (or high bits set) would diverge
+	// (retail reads it negative). Latent: all callers pass small .13 scales (MainFreeze passes 0x1000),
+	// so unobservable today — cast to (s16) to stay bit-exact with retail's sll/sra.
+	bitshiftPosY = (int)(((u32)y2 - ((int)topLeftCornerAndPaletteXY >> 8 & 0xffU)) * (s16)scale) >> 0xd;
 
 	*(u16 *)&p->u3 = *(u16 *)&icon->texLayout.u3;
 
-	bitshiftTopRightCorner = (int)(((topRightCornerAndPageXY & 0xff) - (topLeftCornerAndPaletteXY & 0xff)) * (int)scale) >> 0xd;
+	bitshiftTopRightCorner = (int)(((topRightCornerAndPageXY & 0xff) - (topLeftCornerAndPaletteXY & 0xff)) * (s16)scale) >> 0xd;
 
 	// stuff for rotation of primitive
 	iVar13 = *(int *)(&data.trigApprox[((u32)rot & 0x3ff) * 4]) >> 0x10;

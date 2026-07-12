@@ -658,6 +658,12 @@ void VehStuckProc_PlantEaten_Init(struct Thread *t, struct Driver *d)
 		d->funcPtrs[i] = PlayerEatenFuncTable[i];
 }
 
+// NOTE(claude): Ghidra 0x800677d0 — VehStuckProc_PlantEaten_Init nulls funcPtrs[4..10]
+// for the plant-eaten state; only Update/PhysLinear/Audio (1-3) and Animate (0xb) run.
+// Slot 10 (TRANSLATE_MATRIX) was left as VehPhysForce_TranslateMatrix here (copied from the
+// MaskGrab table, which does keep it), so an eaten — and HIDE_MODEL'd — kart would still
+// rebuild its render matrix and tick the water-wake every frame. Retail keeps it NULL.
+// (Also fixes RIP_Init, which installs this table via PlantEaten_Init.)
 DriverFunc PlayerEatenFuncTable[DRIVER_FUNC_COUNT] = {
     NULL,
     VehStuckProc_PlantEaten_Update,
@@ -669,7 +675,7 @@ DriverFunc PlayerEatenFuncTable[DRIVER_FUNC_COUNT] = {
     NULL,
     NULL,
     NULL,
-    VehPhysForce_TranslateMatrix,
+    NULL,
     VehStuckProc_PlantEaten_Animate,
     NULL,
 };
@@ -1022,7 +1028,12 @@ void VehStuckProc_RevEngine_Init(struct Thread *t, struct Driver *d)
 	d->KartStates.RevEngine.chargeState = REV_ENGINE_CHARGE_IDLE;
 	d->KartStates.RevEngine.lockoutFlags = 0;
 
-	d->KartStates.RevEngine.boostMeter = CTR_MipsAddLo(d->const_AccelSpeed_ClassStat, d->const_AccelSpeed_ClassStat / 3);
+	// NOTE(claude): Ghidra 0x80067f4c — retail inits boostMeter = SpeedometerScale (== AccelSpeed_ClassStat)
+	// + SacredFireSpeed/3 (sSacredFire = const_SacredFireSpeed). The second term was AccelSpeed_ClassStat/3
+	// here — wrong per-class constant. If accel is held from the first rev frame, RevEngine_Animate's
+	// rev-held branch never resets boostMeter, so the whole start-line rev charge ramps fireLevel toward
+	// the wrong target. Matches RevEngine_Animate's reset (AccelSpeed_ClassStat + SacredFireSpeed/3).
+	d->KartStates.RevEngine.boostMeter = CTR_MipsAddLo(d->const_AccelSpeed_ClassStat, d->const_SacredFireSpeed / 3);
 }
 
 DriverFunc PlayerRevEngineFuncTable[DRIVER_FUNC_COUNT] = {

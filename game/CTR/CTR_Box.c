@@ -84,7 +84,11 @@ void CTR_Box_DrawClearBox(const RECT *r, const Color *color, int transparency, u
 		return;
 	}
 
-	p->t.texpage = (Texpage){.code = 0xE1, .semiTransparency = transparency, .dither = 1};
+	// NOTE(claude): Ghidra 0x800217b4 `lui v1,0xe100; ori v1,v1,0xa00` — retail's
+	// tpage word is trans<<5 | 0xE1000A00: bit 11 (y_VRAM_EXP) is set alongside
+	// dither. Stock PSX GPUs ignore bit 11, but without it the prim wasn't
+	// byte-identical to retail.
+	p->t.texpage = (Texpage){.code = 0xE1, .semiTransparency = transparency, .dither = 1, .y_VRAM_EXP = 1};
 	p->p.tag.self = 0;
 
 	const PrimCode primCode = {.poly = {.renderCode = RenderCode_Polygon, .quad = 1, .semiTransparency = 1}};

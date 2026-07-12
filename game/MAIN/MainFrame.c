@@ -216,29 +216,36 @@ void MainFrame_GameLogic(struct GameTracker *gGT, struct GamepadSystem *gGamepad
 		psVar9 = 0;
 
 #if defined(CTR_NATIVE)
+		// NOTE(claude): Ghidra 0x80035060-0x800350c8 — retail keeps the current
+		// driver and the driver-1 tracker (pDriverP2) in separate registers: the
+		// tracker persists across iterations, and when a later driver takes the
+		// top-attacker slot the displaced top moves into it. The previous
+		// transcription clobbered the tracker with the loop cursor each
+		// iteration (the "psVar9 = psVar9" no-op was the fossil of the lost
+		// assignment), so the quip below compared against the wrong driver.
 		for (psVar12 = gGT->threadBuckets[0].thread; psVar12 != 0; psVar12 = psVar12->siblingThread)
 		{
-			psVar9 = (struct Driver *)psVar12->object;
+			pvVar12 = (struct Driver *)psVar12->object;
 			psVar10 = psVar9;
-			if (psVar9->driverID == 0)
+
+			if (pvVar12->driverID == 0)
 			{
 			LAB_80035098:
-				psVar8 = psVar9;
+				psVar8 = pvVar12;
 				psVar9 = psVar10;
 			}
 			else
 			{
-				if (psVar9->driverID == 1)
-				{
-					psVar9 = psVar9;
-				}
+				if (pvVar12->driverID == 1)
+					psVar9 = pvVar12;
+
 				psVar10 = psVar8;
-#ifdef CTR_NATIVE
+
 				// NOTE(aalhendi): Retail may read PSX low memory before driver 0 appears.
 				if (psVar8 == NULL)
 					continue;
-#endif
-				if ((u8)psVar9->numTimesAttacking < (u8)psVar8->numTimesAttacking)
+
+				if ((u8)pvVar12->numTimesAttacking < (u8)psVar8->numTimesAttacking)
 					goto LAB_80035098;
 			}
 		}
@@ -249,7 +256,10 @@ void MainFrame_GameLogic(struct GameTracker *gGT, struct GamepadSystem *gGamepad
 			psVar8->quip2 = (s16)iVar4;
 		}
 
-		for (iVar4 = 0; iVar4 < NUM_BUCKETS; iVar4++)
+		// NOTE(claude): Ghidra 0x80035388 `while (i < 0x11)` — retail dispatches
+		// buckets PLAYER..HUD only; the PAUSE bucket (0x11) is never ticked
+		// here, so the bound is PAUSE, not NUM_BUCKETS (0x12).
+		for (iVar4 = 0; iVar4 < PAUSE; iVar4++)
 		{
 			if ((((gGT->gameMode1 & DEBUG_MENU) == 0) || ((gGT->threadBuckets[iVar4].boolCantPause & 1) != 0)) &&
 
@@ -678,6 +688,11 @@ void MainFrame_VisMemFullFrame(struct GameTracker *gGT, struct Level *level)
 			{
 				visMem->visOVertSrc[playerIndex] = camDC->visOVertSrc;
 
+				// NOTE(claude): Ghidra 0x80035c40 — retail's changed-source branch memcpy/RLE-
+				// copies straight from camDC->visOVertSrc with NO null check, so a source that
+				// just went NULL makes it read from address 0 (harmless garbage on PSX, but a
+				// crash on the native port). Guard it and fall back to the level default (unk5),
+				// mirroring the unchanged-NULL case below. (SCVert path does the same vs unk_170.)
 				if (camDC->visOVertSrc != NULL)
 				{
 					MainFrame_ReplacePackedVisList(visMem->visOVertList[playerIndex], camDC->visOVertSrc, ((level->numWaterVertices + 0x1f) >> 5) << 2);

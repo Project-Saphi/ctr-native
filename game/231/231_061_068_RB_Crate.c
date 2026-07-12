@@ -22,7 +22,13 @@ static void RB_CrateAny_CheckBlockage(struct Thread *crateTh, int hitModelIDValu
 	}
 }
 
-struct Driver *RB_CrateAny_GetDriver(struct Thread *t, struct ScratchpadStruct *sps)
+// NOTE(claude): abortForAI added — the AI-owner abort (actionsFlagSet & ACTION_BOT → return 1) is
+// present in the Weapon (asm 0x800b4000) and Time (0x800b493c) handlers but ABSENT in the Fruit
+// handler (asm 0x800b4584: driverParent → award, no 0x2c8&0x100000 check). The fruit crate awards
+// wumpa to a weapon's owner even when that owner is an AI; the other two skip AI owners. This shared
+// helper had hard-coded the abort, so the fruit crate wrongly skipped AI weapon owners. Callers pass
+// abortForAI=1 (weapon/time) or 0 (fruit).
+struct Driver *RB_CrateAny_GetDriver(struct Thread *t, struct ScratchpadStruct *sps, b32 abortForAI)
 {
 	int hitModelID;
 	int hitModelIDValue;
@@ -42,10 +48,10 @@ struct Driver *RB_CrateAny_GetDriver(struct Thread *t, struct ScratchpadStruct *
 		// get driver that used the weapon
 		driver = ((struct TrackerWeapon *)t->object)->driverParent;
 
-		// if this is an AI, quit
+		// if this is an AI, quit (weapon/time crates only; fruit crate awards AI owners too)
 
 		// it's odd that it casts "1" as struct Driver*, but callers of this function *do* check the return value == 1, so it must be intentional.
-		if ((driver->actionsFlagSet & ACTION_BOT) != 0)
+		if (abortForAI && (driver->actionsFlagSet & ACTION_BOT) != 0)
 			return (struct Driver *)1;
 
 		return driver;
@@ -232,18 +238,20 @@ int RB_CrateWeapon_ThCollide(struct Thread *crateThread, struct Thread *collidin
 	crateInst = crateThread->inst;
 	crateObj = ((struct Crate *)crateThread->object);
 
-	if (crateObj->cooldown == 0)
+	// NOTE(claude): a mid-grow crate (cooldown==0, scale strictly between 0 and 0x1000) must fall
+	// through to the shared blockage tail (asm 0x800b3ec4 `bne v1,0x1000,blockage`; the retail Fruit
+	// gate is literally `cooldown==0 && (scale==0||scale==0x1000)`), NOT early-return — the tail
+	// clears the sps->modelID 0x8000 flag (and may set boolPauseCooldown). The prior
+	// `if (scale!=0 && scale!=0x1000) return 0` skipped it. Applies to all three crate ThCollides.
+	if ((crateObj->cooldown == 0) && ((crateInst->scale.x == 0) || (crateInst->scale.x == 0x1000)))
 	{
-		if ((crateInst->scale.x != 0) && (crateInst->scale.x != 0x1000))
-			return 0;
-
 		crateObj->cooldown = 0x1e;
 
 		if (crateInst->scale.x == 0x1000)
 		{
 			RB_CrateAny_ExplodeInit(crateInst, 0xfafafa0, true);
 
-			driver = RB_CrateAny_GetDriver(collidingTh, sps);
+			driver = RB_CrateAny_GetDriver(collidingTh, sps, 1);
 			if ((int)driver == 1)
 				return 1;
 
@@ -337,18 +345,16 @@ int RB_CrateFruit_ThCollide(struct Thread *crateThread, struct Thread *colliding
 	crateInst = crateThread->inst;
 	crateObj = ((struct Crate *)crateThread->object);
 
-	if (crateObj->cooldown == 0)
+	// NOTE(claude): mid-grow → blockage tail, not early-return (see RB_CrateWeapon_ThCollide).
+	if ((crateObj->cooldown == 0) && ((crateInst->scale.x == 0) || (crateInst->scale.x == 0x1000)))
 	{
-		if ((crateInst->scale.x != 0) && (crateInst->scale.x != 0x1000))
-			return 0;
-
 		crateObj->cooldown = 0x1e;
 
 		if (crateInst->scale.x == 0x1000)
 		{
 			RB_CrateAny_ExplodeInit(crateInst, 0xf2953a0, false);
 
-			driver = RB_CrateAny_GetDriver(collidingTh, sps);
+			driver = RB_CrateAny_GetDriver(collidingTh, sps, 0);
 			if ((int)driver == 1)
 				return 1;
 
@@ -417,11 +423,9 @@ int RB_CrateTime_ThCollide(struct Thread *crateThread, struct Thread *driverTh, 
 	crateInst = crateThread->inst;
 	crateObj = ((struct Crate *)crateThread->object);
 
-	if (crateObj->cooldown == 0)
+	// NOTE(claude): mid-grow → blockage tail, not early-return (see RB_CrateWeapon_ThCollide).
+	if ((crateObj->cooldown == 0) && ((crateInst->scale.x == 0) || (crateInst->scale.x == 0x1000)))
 	{
-		if ((crateInst->scale.x != 0) && (crateInst->scale.x != 0x1000))
-			return 0;
-
 		crateObj->cooldown = 0x1e;
 
 		if (crateInst->scale.x == 0x1000)
@@ -429,7 +433,7 @@ int RB_CrateTime_ThCollide(struct Thread *crateThread, struct Thread *driverTh, 
 			RB_CrateAny_ExplodeInit(crateInst, 0x80ff000, true);
 
 			gGT = sdata->gGT;
-			driver = RB_CrateAny_GetDriver(driverTh, sps);
+			driver = RB_CrateAny_GetDriver(driverTh, sps, 1);
 			if ((int)driver == 1)
 				return 1;
 

@@ -486,7 +486,10 @@ void EngineSound_NearestAIs(void)
 	int closestDistances[2];
 	s16 closestPlayers[2];
 
-	if (gGT->numBotsCurrGame == 0)
+	// NOTE(claude): Ghidra asm 0x8002ff50 `lbu v0,0x1cab` — retail gates on
+	// numBotsNextGame (0x1cab), not numBotsCurrGame (0x1caa). Odd but
+	// authoritative; the two differ during race setup/transitions.
+	if (gGT->numBotsNextGame == 0)
 		return;
 
 	closestDrivers[0] = NULL;

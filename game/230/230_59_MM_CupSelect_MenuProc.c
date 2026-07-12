@@ -107,7 +107,12 @@ void MM_CupSelect_MenuProc(struct RectMenu *menu)
 		if (cupIndex == menu->rowSelected)
 		{
 			// Make text flash
-			if ((sdata->frameCounter & 2) != 0)
+			// NOTE(claude): Ghidra 0x800b1218-0x800b1228 sets the +4 flash bit
+			// (0xffff8004) when `(frameCounter & 2) == 0`, and keeps 0xffff8000
+			// when the branch `bne v0,zero` is taken (i.e. `!= 0`). The prior
+			// `!= 0` here inverted the flash phase of the selected cup name vs
+			// retail; use `== 0` to match the binary.
+			if ((sdata->frameCounter & 2) == 0)
 				txtColor |= 4;
 		}
 

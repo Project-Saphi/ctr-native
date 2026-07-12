@@ -46,11 +46,12 @@ s16 SubmitName_DrawMenu(u16 string)
 	strlenCurrNameEnteredInt = strlen(gGT->currNameEntered);
 	currNameLength = strlenCurrNameEnteredInt;
 	currNameEntered = gGT->currNameEntered;
-	blinkWhite = ((sdata->typeTimer >> 0) & 1) << 2;
 
 	while (currNameEntered[0] != 0)
 	{
-		if (currNameEntered[0] > 2)
+		// NOTE(claude): Ghidra 0x8004aa60 — retail counts glyphs with an
+		// UNSIGNED byte compare (lbu); signed char would skip bytes >= 0x80.
+		if ((u8)currNameEntered[0] > 2)
 		{
 			nameLength++;
 		}
@@ -65,6 +66,10 @@ s16 SubmitName_DrawMenu(u16 string)
 	}
 
 	sdata->typeTimer++;
+	// NOTE(claude): Ghidra 0x8004aa60 — retail samples (timer & 1) AFTER the
+	// increment at every blink site; computing it before inverted the blink
+	// phase relative to the underscore's live (timer & 2) read.
+	blinkWhite = (sdata->typeTimer & 1) << 2;
 	letterID = 0;
 
 	// grid of letters, 13x3
@@ -364,7 +369,9 @@ s16 SubmitName_DrawMenu(u16 string)
 					soundID = 4;
 					gGT->currNameEntered[currNameLength - 1] = 0;
 
-					if (gGT->currNameEntered[currNameLength - 2] < 3)
+					// NOTE(claude): Ghidra 0x8004aa60 — retail lead-byte test is
+					// an unsigned lbu compare; signed char zeroes bytes >= 0x80.
+					if ((u8)gGT->currNameEntered[currNameLength - 2] < 3)
 						gGT->currNameEntered[currNameLength - 2] = 0;
 				}
 			}

@@ -17,14 +17,20 @@ void LOAD_TalkingMask(int packID, int maskID)
 	MEMPACK_SwapPacks(packID);
 	MEMPACK_ClearLowMem();
 
-	sdata->PatchMem_Size = 1;
+	// NOTE(claude): Ghidra 0x80034830 `sw v0,0x138(gp)` = 0x8008d0a4 =
+	// load_inProgress, not PatchMem_Size (0x8008d094) — same fix as
+	// LOAD_Hub_ReadFile.
+	sdata->load_inProgress = 1;
 
 	int offset = maskID * 4 + (packID - 1) * 2;
 
 	// NOTE(aalhendi): Retail queues legacy VRAM type 3 with no final callback.
-	LOAD_AppendQueue(0, LT_VRAM, BI_UKAHEAD + offset, NULL, NULL);
+	// NOTE(claude): Ghidra 0x80034828/0x80034850 `lw a0,0x130(gp)` = 0x8008d09c
+	// = ptrBigfileCdPos_2 — retail passes the real bigfile header, not NULL
+	// (the NULL→ptrBigfile1 fallback in ReadFile_ex is a port shim).
+	LOAD_AppendQueue(sdata->ptrBigfileCdPos_2, LT_VRAM, BI_UKAHEAD + offset, NULL, NULL);
 
-	LOAD_AppendQueue(0, LT_GETADDR, BI_UKAHEAD + offset + 1, NULL, LOAD_Callback_MaskHints3D);
+	LOAD_AppendQueue(sdata->ptrBigfileCdPos_2, LT_GETADDR, BI_UKAHEAD + offset + 1, NULL, LOAD_Callback_MaskHints3D);
 }
 
 // NOTE(aalhendi): ASM-verified NTSC-U 926 0x80034874-0x800348e8.

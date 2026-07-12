@@ -43,10 +43,14 @@ void DebugFont_DrawNumbers(int index, int screenPosX, int screenPosY)
 	gGT->backBuffer->primMem.cursor = p + 1;
 
 	*(int *)&p->r0 = 0x2e000000;
-	*(int *)&p->x0 = screenPosX | uVar5;
-	*(int *)&p->x3 = uVar6 | uVar4;
-	*(int *)&p->x1 = uVar6 | uVar5;
-	*(int *)&p->x2 = screenPosX | uVar4;
+	// NOTE(claude): Ghidra 0x80022318 masks the X halves before OR-packing
+	// (`screenPosX & 0xffff`, `(screenPosX+7) & 0xffff`); without the masks a
+	// negative X sign-extends into the packed Y field (retail renders at negative
+	// X with Y intact).
+	*(int *)&p->x0 = (screenPosX & 0xffff) | uVar5;
+	*(int *)&p->x3 = (uVar6 & 0xffff) | uVar4;
+	*(int *)&p->x1 = (uVar6 & 0xffff) | uVar5;
+	*(int *)&p->x2 = (screenPosX & 0xffff) | uVar4;
 
 	// Each character is 7x7 pixels,
 	// '0' is 6th character on 2nd row

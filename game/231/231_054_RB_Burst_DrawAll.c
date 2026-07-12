@@ -56,7 +56,15 @@ void RB_Burst_DrawAll(struct GameTracker *gGT)
 			pos.vz = burstInst->matrix.t[2];
 
 			gte_ldv0(&pos);
-			gte_mvmva(0, 0, 0, 3, 0);
+			// NOTE(claude): Ghidra 0x800b2694 `cop2 0x0480012` = gte_rt = MVMVA(sf=1, mx=RT,
+			// v=V0, cv=TR, lm=0) → (TR·0x1000 + R·V0) >> 12, i.e. the full camera-space transform
+			// (rotate + translate + >>12; SetRot/SetTransMatrix above load both from the view-proj
+			// matrix). The prior gte_mvmva(0,0,0,3,0) = cop2 0x0406012 = MVMVA(sf=0, cv=none) is
+			// rotate-ONLY — it drops the camera translation AND the >>12, so absX/Y/Z came out
+			// un-translated and ~0x1000× too large, making the |x|<0x100 && |y|<0x100 cull
+			// essentially always fail: the explosion screen fade-flash never fired and pass 2
+			// drew every burst on every split-screen. gte_rt matches the binary.
+			gte_rt();
 			gte_stlvnl(&transformed);
 
 			absX = transformed.vx;

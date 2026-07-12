@@ -241,6 +241,12 @@ void howl_UnPauseAudio()
 	Smart_EnterCriticalSection();
 	for (i = 0, curr = (struct ChannelStats *)sdata->channelFree.first; i < sdata->numBackup_ChannelStats; i++, curr = backupNext)
 	{
+		// NOTE(claude): Ghidra 0x8002c784 has `if (stats == NULL) break;` inside
+		// the restore loop — retail stops when the free list runs dry (channels
+		// can be allocated between pause and unpause); without this we deref NULL.
+		if (curr == NULL)
+			break;
+
 		backupID = curr->channelID;
 		backupPrev = curr->prev;
 		backupNext = curr->next;

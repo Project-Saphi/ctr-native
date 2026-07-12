@@ -410,6 +410,11 @@ void UI_VsQuipDrawAll(void)
 	s16 *printArr;
 	struct Driver *d;
 
+	// NOTE(claude): Ghidra 0x800551e8 — retail sprintf target is a 128-byte
+	// stack buffer (addiu a0,sp,0x20 in a 0xc0 frame), not scratchpad
+	// 0x1f800000; the raw PSX address would also crash the native port.
+	char conjoined[128];
+
 	struct GameTracker *gGT = sdata->gGT;
 	struct Thread *thread;
 
@@ -444,7 +449,7 @@ void UI_VsQuipDrawAll(void)
 		else
 		{
 			// Add two strings together
-			sprintf(0x1f800000,
+			sprintf(conjoined,
 
 			        // Contains '%s' format:
 			        // Original end-of-race comment
@@ -455,8 +460,7 @@ void UI_VsQuipDrawAll(void)
 			        // for stuff like "hit by Crash Bandicoot" or something
 			        sdata->lngStrings[data.MetaDataCharacters[d->EndOfRaceComment_characterID].name_LNG_long]);
 
-			// Overwrite the stack pointer to print
-			print = 0x1f800000;
+			print = conjoined;
 		}
 
 		// get current player's pushBuffer

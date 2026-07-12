@@ -168,7 +168,11 @@ void VehFire_Increment(struct Driver *driver, int reserves, u32 type, int fireLe
 #endif
 
 #if defined(CTR_NATIVE)
-		turboInst1 = INSTANCE_BirthWithThread(0x2c, 0, SMALL, TURBO, VehTurbo_ThTick, sizeof(struct Turbo), 0);
+		// NOTE(claude): Ghidra 0x8005abfc passes s_turbo1_8008d61c ("turbo1") as the
+		// name; INSTANCE_BirthWithThread forwards it to PROC_BirthWithObject (debug
+		// name) and INSTANCE_Birth3D (instance name). Project passed NULL — the sibling
+		// turboInst2 Birth3D already uses s_turbo2, so this was an oversight.
+		turboInst1 = INSTANCE_BirthWithThread(0x2c, &sdata->s_turbo1[0], SMALL, TURBO, VehTurbo_ThTick, sizeof(struct Turbo), 0);
 
 		turboObj = 0;
 

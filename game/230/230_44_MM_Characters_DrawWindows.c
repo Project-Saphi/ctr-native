@@ -127,7 +127,11 @@ void MM_Characters_DrawWindows(int boolShowDrivers)
 		ptrCurr = &D230.characterSelect_charIDs_curr[iVar6];
 
 		iVar10->animFrame = 0;
-		iVar10->vertSplit = 0;
+		// NOTE(claude): Ghidra 0x800adea8 `sb zero,0x52(inst)` clears animIndex (u8 @0x52), not
+		// vertSplit (s16 @0x56). The prior code reset the wrong field — it left animIndex holding
+		// stale animation-set state on the char-select driver models and needlessly zeroed vertSplit
+		// (retail doesn't touch vertSplit here). Reset animIndex to match retail (with animFrame@0x54).
+		iVar10->animIndex = 0;
 
 		uVar4 = MM_Characters_GetModelByName((int *)data.MetaDataCharacters[(int)*ptrCurr].name_Debug);
 

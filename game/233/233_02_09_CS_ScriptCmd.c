@@ -57,7 +57,12 @@ static void CS_ScriptCmd_ReadOpcode_Main(struct CutsceneObj *cs)
 	offsets = (s16 *)decoded;
 
 	cs->prevOpcode = opcodes;
-	offsets[0] = opcodes[0];
+	// NOTE(claude): Ghidra 0x800ac04c `lbu v1,0x0(a0); sh v1,0x0(s0)` — retail loads the opcode
+	// byte ZERO-extended into metadata[0]. `opcodes` is char* (signed on native), so a plain
+	// `offsets[0] = opcodes[0]` sign-extends opcodes >= 0x80 to 0xFFxx vs retail's 0x00xx. Currently
+	// unobservable (the UseOpcode dispatch switch only has cases < 0x80 and the meta lookup below
+	// re-masks with (u8)), but cast to u8 to keep decoded->opcode bit-exact with retail's lbu.
+	offsets[0] = (u8)opcodes[0];
 
 	meta = cs_opcodeMeta[(u8)offsets[0]];
 

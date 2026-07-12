@@ -10,6 +10,13 @@ void RB_Blade_LInB(struct Instance *inst)
 
 	struct Blade *bladeObj;
 
+	// NOTE(claude): Ghidra 0x800b3988 `lw v0,0x6c(s0); bne v0,zero,end` — retail guards the
+	// entire birth on inst->thread==0 (as RB_Baron_LInB and the sibling LInB handlers do). The
+	// decomp dropped it; without it a repeat LInB call re-births a second blade thread and
+	// overwrites inst->thread, orphaning (leaking) the first still-spinning blade. Match the binary.
+	if (inst->thread != 0)
+		return;
+
 	struct Thread *t = PROC_BirthWithObject(
 	    // creation flags
 	    SIZE_RELATIVE_POOL_BUCKET(sizeof(struct Blade), NONE, SMALL, STATIC),

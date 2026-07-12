@@ -212,7 +212,10 @@ void LOAD_VramFileCallback(struct LoadQueueSlot *lqs)
 			LoadImage(&vh->rect, VRAMHEADER_GETPIXLES(vh));
 
 			// goto next
-			vramBuf = (u32)vh + size;
+			// NOTE(claude): Ghidra 0x80031f5c `sra v0,s1,2; sll v0,v0,2` — retail
+			// advances by size with the low 2 bits masked (int* arithmetic in the
+			// original source); a raw byte add diverges for unaligned sizes.
+			vramBuf = (int *)((u32)vh + (size & ~3));
 
 			size = vramBuf[0];
 			vh = (struct VramHeader *)&vramBuf[1];
@@ -301,7 +304,10 @@ void LOAD_ReadFileASyncCallback(CdlIntrResult result, u8 *unk)
 #endif
 		{
 			// undo allocation, try again
-			MEMPACK_ReallocMem(0);
+			// NOTE(claude): Ghidra 0x80032194 `jal 0x8003e9d0` = MEMPACK_PopState
+			// (syms926), no argument — retail restores the mempack bookmark on CD
+			// error, it does not ReallocMem(0).
+			MEMPACK_PopState();
 		}
 
 		sdata->queueRetry = 1;
@@ -395,7 +401,10 @@ void *LOAD_ReadFile_ex(struct BigHeader *bigfile, u32 loadType, int subfileIndex
 		if (callback == NULL)
 		{
 			// Wait for all sectors to finish
-			readComplete = CdReadSync(0, (u8 *)0x0) < 1;
+			// NOTE(claude): Ghidra 0x800322e4 `sltiu s4,v0,1` — unsigned, i.e.
+			// == 0; a signed `< 1` would treat CdReadSync's -1 error return as
+			// complete and skip the retry loop.
+			readComplete = CdReadSync(0, (u8 *)0x0) == 0;
 		}
 
 		// If either command failed, or sync read did not finish, retry.
@@ -420,8 +429,11 @@ void *LOAD_XnfFile(char *filename, void *ptrDestination, int *size)
 	LOAD_StringToUpper(filename);
 	CDSYS_SetMode_StreamData();
 
+	// NOTE(claude): Ghidra 0x80032384 delay slot `move v0,s0` — on a failed
+	// search retail returns the caller's ptrDestination (NULL only if the
+	// caller passed NULL); *size is left unwritten.
 	if (CdSearchFile(&cdlFile, filename) == 0)
-		return 0;
+		return ptrDestination;
 
 	*size = cdlFile.size;
 

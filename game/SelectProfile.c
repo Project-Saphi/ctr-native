@@ -149,7 +149,10 @@ void SelectProfile_DrawAdvProfile(struct AdvProgress *adv, int posX, int posY, s
 		int iconID = data.MetaDataCharacters[characterID].iconID;
 		struct SelectProfileLoadSaveObj *obj = (struct SelectProfileLoadSaveObj *)sdata->ptrLoadSaveObj;
 
-		RECTMENU_DrawPolyGT4(gGT->ptrIcons[iconID], posX + 10, posY + 6, &gGT->backBuffer->primMem, gGT->backBuffer->otMem.uiOT, iconColor, iconColor,
+		// NOTE(claude): Ghidra 0x80047ff8 — retail links the character icon into
+		// pushBuffer_UI.ptrOT (the live UI OT), not otMem.uiOT; the two can
+		// diverge (e.g. RaceFlag redirects ptrOT), changing draw order.
+		RECTMENU_DrawPolyGT4(gGT->ptrIcons[iconID], posX + 10, posY + 6, &gGT->backBuffer->primMem, (u_long *)gGT->pushBuffer_UI.ptrOT, iconColor, iconColor,
 		                     iconColor, iconColor, 1, 0x1000);
 
 		DecalFont_DrawLine(adv->name, posX + 0x6c, posY + 0x29, FONT_BIG, nameColor | 0xffff8000);
@@ -407,7 +410,9 @@ void SelectProfile_DrawGhostProfile(struct GhostProfile *profile, int posX, int 
 
 		DecalFont_DrawLine(sdata->lngStrings[mdLev->name_LNG], posX + 0x64, posY + 0x1e, FONT_SMALL, 0xffff801d);
 		DecalFont_DrawLine(RECTMENU_DrawTime(profile->trackTime), posX + 0x78, posY + 10, FONT_BIG, 0xffff8001);
-		RECTMENU_DrawPolyGT4(gGT->ptrIcons[iconID], posX + 8, posY + 5, &gGT->backBuffer->primMem, gGT->backBuffer->otMem.uiOT, sdata->ghostIconColor,
+		// NOTE(claude): Ghidra 0x80048a30 — icon goes to pushBuffer_UI.ptrOT in
+		// retail (same as DrawAdvProfile), not otMem.uiOT.
+		RECTMENU_DrawPolyGT4(gGT->ptrIcons[iconID], posX + 8, posY + 5, &gGT->backBuffer->primMem, (u_long *)gGT->pushBuffer_UI.ptrOT, sdata->ghostIconColor,
 		                     sdata->ghostIconColor, sdata->ghostIconColor, sdata->ghostIconColor, TRANS_50_DECAL, 0x1000);
 	}
 	else
@@ -535,9 +540,12 @@ u32 SelectProfile_InputLogic(struct RectMenu *menu, s16 numRows, u32 confirmFlag
 		if ((u16)menu->rowSelected != oldRow)
 			OtherFX_Play(0, 1);
 
-		if (((tap & (BTN_CROSS | BTN_CIRCLE)) == 0) || ((numRows == 0) && (sdata->memcardAction != 1)))
+		// NOTE(claude): Ghidra 0x80048fd4 andi 0x50 / 0x80049024 ori 0x40020 —
+		// retail's select/back masks use only CROSS_one(0x10)/SQUARE_one(0x20);
+		// the composite BTN_CROSS/BTN_SQUARE add raw bits retail doesn't test.
+		if (((tap & (BTN_CROSS_one | BTN_CIRCLE)) == 0) || ((numRows == 0) && (sdata->memcardAction != 1)))
 		{
-			if ((tap & (BTN_TRIANGLE | BTN_SQUARE)) != 0)
+			if ((tap & (BTN_TRIANGLE | BTN_SQUARE_one)) != 0)
 			{
 				OtherFX_Play(2, 1);
 				handled = 1;
@@ -555,7 +563,8 @@ u32 SelectProfile_InputLogic(struct RectMenu *menu, s16 numRows, u32 confirmFlag
 	}
 	else
 	{
-		u32 cancel = (tap & (BTN_TRIANGLE | BTN_SQUARE)) != 0;
+		// NOTE(claude): Ghidra 0x80049050/0x80049084 — same _one masks here.
+		u32 cancel = (tap & (BTN_TRIANGLE | BTN_SQUARE_one)) != 0;
 
 		if (cancel)
 		{
@@ -565,7 +574,7 @@ u32 SelectProfile_InputLogic(struct RectMenu *menu, s16 numRows, u32 confirmFlag
 
 		handled = cancel;
 
-		if (((confirmFlags & 2) != 0) && ((tap & (BTN_CROSS | BTN_CIRCLE)) != 0))
+		if (((confirmFlags & 2) != 0) && ((tap & (BTN_CROSS_one | BTN_CIRCLE)) != 0))
 		{
 			OtherFX_Play(1, 1);
 			handled = 1;
@@ -751,7 +760,11 @@ static void SelectProfile_DrawGhostRows(struct RectMenu *menu, int rowCount, int
 	int rowCountWithEmpty = sdata->numGhostProfilesSaved + canChooseEmptySlot;
 	struct GhostProfile *profile = &sdata->ghostProfile_memcard[0];
 
-	subtitleVisible = strlen(sdata->lngStrings[data.lngIndex_LoadSave[(sdata->memcardAction * 2) + 1]]) != 0;
+	// NOTE(claude): Ghidra 0x800490c4 — retail's ghost-branch strlen reads the
+	// ADV subtitle table @80085d8a (lngStringsSaveLoadDelete), a retail
+	// copy-paste quirk, while the drawn text comes from lngIndex_LoadSave;
+	// keep the quirk so layout matches (yBase/titleEndY depend on it).
+	subtitleVisible = strlen(sdata->lngStrings[data.lngStringsSaveLoadDelete[(sdata->memcardAction * 2) + 1]]) != 0;
 
 	if (rowCount < 7)
 	{
@@ -880,9 +893,11 @@ static int SelectProfile_ProcessOverwritePrompt(void)
 			overwriteMenu->rowSelected++;
 		}
 	}
-	else if ((tap & (BTN_CROSS | BTN_CIRCLE | BTN_TRIANGLE | BTN_SQUARE)) != 0)
+	// NOTE(claude): Ghidra 0x800490c4 confirm-box input — retail masks are
+	// 0x40070 / 0x50 (CROSS_one/SQUARE_one), not the composite BTN_* values.
+	else if ((tap & (BTN_CROSS_one | BTN_CIRCLE | BTN_TRIANGLE | BTN_SQUARE_one)) != 0)
 	{
-		if ((tap & (BTN_CROSS | BTN_CIRCLE)) != 0)
+		if ((tap & (BTN_CROSS_one | BTN_CIRCLE)) != 0)
 		{
 			OtherFX_Play(1, 1);
 			confirm = overwriteMenu->rowSelected == 0;
@@ -898,42 +913,6 @@ static int SelectProfile_ProcessOverwritePrompt(void)
 	data.menuOverwriteAdv.rowSelected = overwriteMenu->rowSelected;
 	data.menuOverwriteGhost.rowSelected = overwriteMenu->rowSelected;
 	return confirm;
-}
-
-static void SelectProfile_HandleNoCardOrSpace(struct RectMenu *menu)
-{
-	int mode = *SelectProfile_AllProfiles_Mode();
-
-	if (sdata->mcScreenText == MC_SCREEN_WARNING_NOCARD)
-	{
-		if (sdata->memcardAction == 1)
-		{
-			*SelectProfile_AllProfiles_ActionActive() = sdata->memcardAction;
-			*SelectProfile_AllProfiles_ActionDone() = sdata->memcardAction;
-			sdata->boolError = 1;
-		}
-		else if ((sdata->memcardAction == 0) && (mode == 0x30))
-		{
-			*SelectProfile_AllProfiles_ActionActive() = 1;
-			*SelectProfile_AllProfiles_ActionDone() = 1;
-			sdata->boolError = 1;
-		}
-	}
-
-	if ((sdata->mcScreenText != MC_SCREEN_WARNING_UNFORMATTED) && (sdata->memoryCard_SizeRemaining < 0x1680) &&
-	    (*(s16 *)&sdata->unk_memcardRelated_8008d928[0] == 0) && (sdata->memcardAction == 1))
-	{
-		*SelectProfile_AllProfiles_ActionActive() = 1;
-		*SelectProfile_AllProfiles_ActionDone() = 1;
-		sdata->boolError = 1;
-	}
-
-	if (menu->rowSelected == -1)
-	{
-		*SelectProfile_AllProfiles_ActionActive() = 1;
-		*SelectProfile_AllProfiles_ExitToPrevious() = 1;
-		sdata->boolError = 1;
-	}
 }
 
 static void SelectProfile_StartLoadGhost(struct RectMenu *menu, int rowCount)
@@ -965,6 +944,7 @@ static void SelectProfile_StartLoadGhost(struct RectMenu *menu, int rowCount)
 static int SelectProfile_HandleSelection(struct RectMenu *menu, int rowCount)
 {
 	int mode = *SelectProfile_AllProfiles_Mode();
+	int proceed = 1;
 
 	if (menu->rowSelected == -1)
 	{
@@ -973,6 +953,40 @@ static int SelectProfile_HandleSelection(struct RectMenu *menu, int rowCount)
 		sdata->boolError = 1;
 		return 0;
 	}
+
+	// NOTE(claude): Ghidra 0x800490c4 (bProceed gating after LAB_800495b0) —
+	// NOCARD only latches ActionActive/Done for memcardAction==1 and only
+	// lets mode-0 ghost selection proceed; the low-space condition merely
+	// VETOES the selection. The old HandleNoCardOrSpace helper latched
+	// ActionActive/ActionDone for those cases too, force-finalizing the menu
+	// where retail keeps it open.
+	if (sdata->mcScreenText == MC_SCREEN_WARNING_NOCARD)
+	{
+		proceed = 0;
+
+		if (sdata->memcardAction == 1)
+		{
+			*SelectProfile_AllProfiles_ActionActive() = 1;
+			*SelectProfile_AllProfiles_ActionDone() = 1;
+			sdata->boolError = 1;
+		}
+		else if ((sdata->memcardAction == 0) && (mode == 0x30))
+		{
+			proceed = 1;
+		}
+	}
+
+	if (mode != 0x30)
+	{
+		if ((sdata->mcScreenText != MC_SCREEN_WARNING_UNFORMATTED) && (sdata->memoryCard_SizeRemaining < 0x1680) &&
+		    (*(s16 *)&sdata->unk_memcardRelated_8008d928[0] == 0) && (sdata->memcardAction == 1))
+		{
+			proceed = 0;
+		}
+	}
+
+	if (proceed == 0)
+		return 0;
 
 	if (sdata->mcScreenText == MC_SCREEN_WARNING_UNFORMATTED)
 	{
@@ -1075,8 +1089,19 @@ static void SelectProfile_DrawMemcardMessage(int screen, int color, int menuFlag
 	if (firstString >= 0xffff)
 		return;
 
+	// NOTE(claude): Ghidra 0x800490c4 message branch — gated on the done flag
+	// (d8fe==0) in retail; and for adventure modes on the NODATA screen retail
+	// also draws the out-of-date warning here (in addition to DrawAdvRows).
+	if (*SelectProfile_AllProfiles_ActionDone() != 0)
+		return;
+
 	if ((firstString == 0x10f) && (sdata->memcardAction == 1))
 		firstString = 0x106;
+
+	if ((*SelectProfile_AllProfiles_Mode() != 0x30) && (screen == MC_SCREEN_ERROR_NODATA) && (sdata->boolMemcardDataValid != 0))
+	{
+		DecalFont_DrawLine(sdata->lngStrings[LNG_DATA_ON_MEMORY_CARD_IS_OUT_OF_DATE], 0x100, 0xc3, FONT_SMALL, JUSTIFY_CENTER | RED);
+	}
 
 	if ((sdata->memcardAction == 2) && (firstString == 0xea))
 		firstString = 0xfc;
@@ -1094,7 +1119,9 @@ static void SelectProfile_DrawMemcardMessage(int screen, int color, int menuFlag
 			if (strlen(line) != 0)
 			{
 				int font = (i == 0) ? FONT_BIG : FONT_SMALL;
-				int y = (i == 0) ? 0x26 : 0x2e + (i * 10);
+				// NOTE(claude): Ghidra 0x800490c4 — retail spaces lines by
+				// fontCharPixHeight[SMALL]+2, not a hardcoded 10.
+				int y = (i == 0) ? 0x26 : 0x2e + (i * (data.font_charPixHeight[FONT_SMALL] + 2));
 				int lineColor = color | 0xffff8000;
 
 				if (((sdata->frameCounter & 4) == 0) && (i == 0))
@@ -1108,11 +1135,16 @@ static void SelectProfile_DrawMemcardMessage(int screen, int color, int menuFlag
 	RECTMENU_DrawInnerRect((RECT *)&sdata->unk_BeforeTokenMenu[0], menuFlag, sdata->gGT->backBuffer->otMem.uiOT);
 }
 
-static void SelectProfile_DrawAll(struct RectMenu *menu, int rowCount, int savedGhostCount, int canChooseEmptySlot, int color)
+static void SelectProfile_DrawAll(struct RectMenu *menu, int rowCount, int savedGhostCount, int canChooseEmptySlot, int color, int doSave)
 {
+	int screenOverride = sdata->mcScreenText;
+
+	// NOTE(claude): Ghidra 0x800490c4 draw gate — retail requires RefreshFlag
+	// AND (RefreshState OR screen==NULL); the old OR-of-all-three form drew
+	// profile rows in states where retail shows a status message.
 	int canDrawProfiles =
-	    (*SelectProfile_AllProfiles_ActionActive() == 0) &&
-	    ((*(s16 *)&sdata->unk8008d95c != 0) || (*(s16 *)&sdata->unk_memcardRelated_8008d928[0] != 0) || (sdata->mcScreenText == MC_SCREEN_NULL));
+	    (*SelectProfile_AllProfiles_ActionActive() == 0) && (*(s16 *)&sdata->unk8008d95c != 0) &&
+	    ((*(s16 *)&sdata->unk_memcardRelated_8008d928[0] != 0) || (sdata->mcScreenText == MC_SCREEN_NULL));
 
 	if ((sdata->memcardAction == 0) && SelectProfile_IsGhostMode() &&
 	    ((sdata->mcScreenText == MC_SCREEN_ERROR_NODATA) || (sdata->mcScreenText == MC_SCREEN_WARNING_NOCARD)) && (rowCount != 0))
@@ -1122,9 +1154,33 @@ static void SelectProfile_DrawAll(struct RectMenu *menu, int rowCount, int saved
 	{
 		if ((sdata->mcScreenText == MC_SCREEN_NULL) || (sdata->mcScreenText == MC_SCREEN_ERROR_NODATA))
 		{
-			canDrawProfiles = SelectProfile_IsGhostMode()
-			                      ? !((sdata->memoryCard_SizeRemaining < 0x3e00) && (savedGhostCount == 0))
-			                      : !((sdata->memoryCard_SizeRemaining < 0x1680) && (*(s16 *)&sdata->unk_memcardRelated_8008d928[0] == 0));
+			canDrawProfiles = 0;
+
+			// NOTE(claude): Ghidra 0x800490c4 — on the frame a save starts
+			// retail shows the SAVING text; when space is short it shows
+			// ERROR_FULL instead of the current screen's (blank) message.
+			if (doSave != 0)
+			{
+				screenOverride = MC_SCREEN_SAVING;
+			}
+			else if (SelectProfile_IsGhostMode())
+			{
+				canDrawProfiles = 1;
+				if ((sdata->memoryCard_SizeRemaining < 0x3e00) && (savedGhostCount == 0))
+				{
+					canDrawProfiles = 0;
+					screenOverride = MC_SCREEN_ERROR_FULL;
+				}
+			}
+			else
+			{
+				canDrawProfiles = 1;
+				if ((sdata->memoryCard_SizeRemaining < 0x1680) && (*(s16 *)&sdata->unk_memcardRelated_8008d928[0] == 0))
+				{
+					canDrawProfiles = 0;
+					screenOverride = MC_SCREEN_ERROR_FULL;
+				}
+			}
 		}
 
 		if ((sdata->mcScreenText == MC_SCREEN_ERROR_TIMEOUT) && (*SelectProfile_AllProfiles_TimeoutPrompt() != 0))
@@ -1162,7 +1218,7 @@ static void SelectProfile_DrawAll(struct RectMenu *menu, int rowCount, int saved
 		}
 		else
 		{
-			SelectProfile_DrawMemcardMessage(sdata->mcScreenText, color, menu->drawStyle);
+			SelectProfile_DrawMemcardMessage(screenOverride, color, menu->drawStyle);
 		}
 	}
 }
@@ -1220,14 +1276,20 @@ static void SelectProfile_FinalizeAdventure(struct RectMenu *menu)
 
 	if (mode == 0x20)
 	{
+		// NOTE(claude): Ghidra 0x800490c4 finalize — retail records
+		// advProfileIndex whenever the exit flag is clear (comma-op; even in
+		// save mode, so re-saving the same slot skips the overwrite prompt),
+		// and the rowSelected=3 write targets menuGreenLoadSave in BOTH arms.
+		if (*SelectProfile_AllProfiles_ExitToPrevious() == 0)
+			sdata->advProfileIndex = menu->rowSelected;
+
 		if ((*SelectProfile_AllProfiles_ExitToPrevious() == 0) && (sdata->memcardAction == 0))
 		{
-			sdata->advProfileIndex = menu->rowSelected;
 			GAMEPROG_AdvPercent(&sdata->advProgress);
 			sdata->ptrDesiredMenu = &data.menuQueueLoadHub;
 			// NOTE(aalhendi): Retail 0x8004a8a0-0x8004a8c4 queues through currLEV.
 			gGT->currLEV = sdata->advProgress.HubLevYouSavedOn;
-			data.menuQueueLoadHub.rowSelected = 3;
+			data.menuGreenLoadSave.rowSelected = 3;
 		}
 		else
 		{
@@ -1287,7 +1349,11 @@ static void SelectProfile_FinalizeAdventure(struct RectMenu *menu)
 		}
 		else if (*SelectProfile_AllProfiles_ExitToPrevious() != 0)
 		{
-			sdata->ptrDesiredMenu = &data.menuWarning2;
+			// NOTE(claude): Ghidra 0x800490c4 — retail routes back to
+			// data_menuBox_saveGame (the "Save Game?" prompt that
+			// TakeCupProgress_Activate shows), not warning2 (the save screen
+			// itself, which retail only opens from the prompt's YES).
+			sdata->ptrDesiredMenu = &data.menuSaveGame;
 			return;
 		}
 
@@ -1295,7 +1361,11 @@ static void SelectProfile_FinalizeAdventure(struct RectMenu *menu)
 	}
 }
 
-// NOTE(aalhendi): Partial retail audit only; this large structured rewrite is not fully ASM-stamped.
+// NOTE(claude): Verified against Ghidra 0x800490c4-0x8004a8c4 (2026-07-04);
+// the helper decomposition now mirrors retail's FSM (selection gating, draw
+// gate, screen overrides, finalize routing). Remaining deliberate divergences:
+// native NULL guards (ghost-tape memset/charID read) and redundant boolError
+// writes that match RefreshCard_Unknown3's per-frame steady state.
 void SelectProfile_AllProfiles_MenuProc(struct RectMenu *menu)
 {
 	int color = ((menu->drawStyle & 0x10) != 0) ? LIGHT_GREEN : ORANGE;
@@ -1337,7 +1407,8 @@ void SelectProfile_AllProfiles_MenuProc(struct RectMenu *menu)
 		{
 			if (sdata->mcScreenText == MC_SCREEN_WARNING_NOCARD)
 			{
-				if ((sdata->buttonTapPerPlayer[0] & (BTN_CROSS | BTN_CIRCLE)) != 0)
+				// NOTE(claude): Ghidra 0x800490c4 — retail andi 0x50 (CROSS_one|CIRCLE).
+				if ((sdata->buttonTapPerPlayer[0] & (BTN_CROSS_one | BTN_CIRCLE)) != 0)
 				{
 					OtherFX_Play(1, 1);
 					if (sdata->boolSaveCupProgress == 0)
@@ -1379,7 +1450,6 @@ void SelectProfile_AllProfiles_MenuProc(struct RectMenu *menu)
 
 		if (handled != 0)
 		{
-			SelectProfile_HandleNoCardOrSpace(menu);
 			doSave = SelectProfile_HandleSelection(menu, rowCount);
 		}
 	}
@@ -1404,7 +1474,7 @@ draw_and_finish:
 	}
 
 	if (menu->unk1e == 1)
-		SelectProfile_DrawAll(menu, rowCount, savedGhostCount, canChooseEmptySlot, color);
+		SelectProfile_DrawAll(menu, rowCount, savedGhostCount, canChooseEmptySlot, color, doSave);
 
 	if (SelectProfile_ShouldFinalize())
 	{

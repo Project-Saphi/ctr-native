@@ -629,7 +629,13 @@ static void VehEmitter_SkidmarkAudio(struct Thread *thread, struct Driver *d, st
 		if (distort > 0x92)
 			distort = 0x92;
 
-		u32 flags = (u32)((vol + (absTurn >> 1)) << 16) | (u32)(distort << 8) | (0x80u - (((u32)(u8)d->simpTurnState << 24) >> 26));
+		// NOTE(claude): Ghidra 0x8005a1a4-0x8005a1b4 `lbu; sll 0x18; sra 0x1a`
+		// — the pan term is (simpTurnState << 24) >> 26 with an ARITHMETIC shift
+		// (sra), i.e. sign-extended, so pan reflects the signed turn direction.
+		// The old `((u32)... ) >> 26` was a LOGICAL (u32) shift, which mirrored the
+		// skidmark-audio L/R pan for negative simpTurnState. Cast to s32 before the
+		// shift to reproduce the sra.
+		u32 flags = (u32)((vol + (absTurn >> 1)) << 16) | (u32)(distort << 8) | (0x80u - (u32)((s32)((u32)(u8)d->simpTurnState << 24) >> 26));
 
 		if ((d->actionsFlagSet & ACTION_ENGINE_ECHO) != 0)
 			flags |= 0x1000000;

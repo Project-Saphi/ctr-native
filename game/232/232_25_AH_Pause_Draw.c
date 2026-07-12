@@ -370,7 +370,11 @@ void AH_Pause_Draw(int pageID, int posX)
 			inst->flags &= ~(HIDE_MODEL | DRAW_TRANSPARENT | USE_SPECULAR_LIGHT | DRAW_BILLBOARD);
 			inst->flags |= D232.advPauseInst[index].instFlags;
 
-			if (ptrPauseObject->PauseMember[i].unlockFlag == 0)
+			// NOTE(claude): Ghidra 0x800b2fa0-ac tests `(unlockFlag & 1) == 0` (andi 0x1 / beq),
+			// not the whole field. The per-frame reset is `&= 0xfffe` (0x800b2218), which clears
+			// only bit 0 and preserves bits 1-15, so a stray high bit would make `== 0` false and
+			// wrongly color a locked icon instead of greying it. Isolate bit 0 to match retail.
+			if ((ptrPauseObject->PauseMember[i].unlockFlag & 1) == 0)
 			{
 				inst->flags &= ~(HIDE_MODEL | DRAW_TRANSPARENT | USE_SPECULAR_LIGHT | DRAW_BILLBOARD);
 				inst->colorRGBA = 0;

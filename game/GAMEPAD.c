@@ -268,7 +268,10 @@ int GAMEPAD_ProcessHold(struct GamepadSystem *gGamepads)
 	char j;
 	char *btnMapPtr;
 	u32 *puVar2;
-	u16 uVar4;
+	// NOTE(claude): Ghidra 0x80025718 keeps the raw button word in a full 32-bit
+	// register; the ANALOG_STICK path shifts it <<16 and the remap table matches
+	// the high half. As u16 the shift truncated to 0, killing flightstick input.
+	u32 uVar4;
 	u32 uVar5;
 	u32 heldAny = 0;
 
@@ -532,7 +535,12 @@ void GAMEPAD_ProcessSticks(struct GamepadSystem *gGamepads)
 
 				if (iVar4 < 0)
 				{
-					iVar7 = ((-10 - iVar4) - rwd->deadZone) * 8;
+					// NOTE(claude): Ghidra 0x800258e8/0x80025924 both `lh v1,0x4(a3)` —
+					// retail reads the rwd field at offset 0x4 (range), NOT 0x2
+					// (deadZone). rwd->range=0x7f vs deadZone=0x30 are distinct (set
+					// from raceConfig_Range/_DeadZone in MainFreeze), so reading
+					// deadZone mis-scaled the JogCon/MadCatz-wheel twist force-feedback.
+					iVar7 = ((-10 - iVar4) - rwd->range) * 8;
 					if (iVar7 < 0)
 						iVar7 = 0;
 					if (iVar7 > 0xff)
@@ -547,7 +555,8 @@ void GAMEPAD_ProcessSticks(struct GamepadSystem *gGamepads)
 				}
 				else
 				{
-					iVar7 = ((iVar4 - 10) - rwd->deadZone) * 8;
+					// NOTE(claude): Ghidra 0x4(a3) — rwd->range (0x4), not deadZone (0x2). See above.
+					iVar7 = ((iVar4 - 10) - rwd->range) * 8;
 					if (iVar7 < 0)
 						iVar7 = 0;
 					if (iVar7 > 0xff)
@@ -681,10 +690,13 @@ void GAMEPAD_ProcessMotors(struct GamepadSystem *gGS)
 					{
 						if ((pad->unk43 < pad->unk42) || (bVar1 = pad->unk43 >> 4, pad->unk48 != 0))
 						{
-							char unk42 = pad->unk42;
+							u8 unk42 = pad->unk42;
 							bVar1 = unk42 >> 4;
 
-							if ((((gGT->timer & bVar1) & 0xf) != 0) && (bVar1 = (unk42 - 0x10) >> 4, (unk42 - 0x10) < 0))
+							// NOTE(claude): Ghidra 0x80025e18 pulses with `timer & unk42 & 0xf` —
+							// the RAW strength byte, not the >>4 value; using the shifted value
+							// broke the pulse pattern whenever unk42's nibbles differ.
+							if ((((gGT->timer & unk42) & 0xf) != 0) && (bVar1 = (unk42 - 0x10) >> 4, (unk42 - 0x10) < 0))
 							{
 								bVar1 = 0;
 							}

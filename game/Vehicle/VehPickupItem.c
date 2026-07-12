@@ -175,11 +175,18 @@ static void VehPickupItem_MissileLoadPlayerView(struct GameTracker *gGT, struct 
 
 static void VehPickupItem_MissileLoadAiView(struct Driver *driver)
 {
-	SVECTOR rot = {driver->rotCurr.x, driver->rotCurr.y, driver->rotCurr.z, 0};
+	// NOTE(claude): Ghidra 0x80064f94 (AI path) builds the target-projection matrix
+	// with ConvertRotToMatrix (the game's Ry*Rx*Rz GTE rotation builder), not the
+	// Psy-Q RotMatrix. The two agree only for single-axis rotations; with combined
+	// pitch/roll (slopes, banked turns) they differ — e.g. m[0][2]=sy*cx (ConvertRot)
+	// vs sy (RotMatrix), m[1][2]=-sx vs -cy*sx — so a pitched/rolled bot's homing
+	// missile would project candidates with the wrong orientation and could lock onto
+	// a different driver. Match retail's rotation convention.
+	SVec3 rot = {driver->rotCurr.x, driver->rotCurr.y, driver->rotCurr.z};
 	MATRIX matrix;
 	MATRIX unusedInverse;
 
-	RotMatrix(&rot, &matrix);
+	ConvertRotToMatrix(&matrix, &rot);
 	matrix.t[0] = CTR_MipsSra(driver->posCurr.x, 8);
 	matrix.t[1] = CTR_MipsSra(driver->posCurr.y, 8);
 	matrix.t[2] = CTR_MipsSra(driver->posCurr.z, 8);
@@ -317,6 +324,7 @@ void VehPickupItem_ShootNow(struct Driver *d, int weaponID, int flags)
 	int modelID;
 	int mineHitModel = 0;
 	int mineShouldInitFollower = 0;
+	int mineSetsInstTntSend = 0;
 
 	switch (weaponID)
 	{
@@ -572,6 +580,7 @@ void VehPickupItem_ShootNow(struct Driver *d, int weaponID, int flags)
 		VehPickupItem_PotionThrow(mw, weaponInst, flags);
 		mineHitModel = weaponInst->model->id | COLL_MODELID_BLOCKAGE_FLAG;
 		mineShouldInitFollower = (flags == 0);
+		mineSetsInstTntSend = 1;
 
 	RunMineCOLL:
 
@@ -643,7 +652,13 @@ void VehPickupItem_ShootNow(struct Driver *d, int weaponID, int flags)
 
 		VehPhysForce_RotAxisAngle(&weaponInst->matrix, rotationNormal, d->angle);
 
-		d->instTntSend = weaponInst;
+		// NOTE(claude): Ghidra 0x8006540c — retail sets instTntSend only in the TNT/Nitro
+		// path (case 3), NOT the dropped-Beaker path (case 4, whose tail is just
+		// RotAxisAngle -> RB_Follower_Init -> DROPPING_MINE). The shared RunMineCOLL set it
+		// unconditionally, so dropping a beaker wrongly recorded it as the driver's sent-TNT
+		// instance (instTntSend feeds TNT-on-head / detonation tracking). Gate to the TNT case.
+		if (mineSetsInstTntSend)
+			d->instTntSend = weaponInst;
 
 		// dropped a mine
 		d->actionsFlagSet |= ACTION_DROPPING_MINE;
@@ -743,7 +758,12 @@ void VehPickupItem_ShootNow(struct Driver *d, int weaponID, int flags)
 		if (d->numWumpas >= 10)
 			modelID = DYNAMIC_SHIELD;
 
-		struct Instance *instColor = INSTANCE_Birth3D(gGT->modelPtr[modelID], sdata->s_shield, 0);
+		// NOTE(claude): Ghidra 0x80065bd0 — retail births the shield color instance with
+		// weaponInst->thread as its owning thread (a2 = 0x6c(s2), loaded at 0x80065b94 and
+		// unmodified through the call), matching the highlight instance below. The project
+		// passed 0 (no owning thread), orphaning instColor from the shield thread's transform
+		// and lifetime management. Pass weaponTh to match retail.
+		struct Instance *instColor = INSTANCE_Birth3D(gGT->modelPtr[modelID], sdata->s_shield, weaponTh);
 
 		struct Instance *instHighlight = INSTANCE_Birth3D(gGT->modelPtr[DYNAMIC_HIGHLIGHT], highlightName, weaponTh);
 

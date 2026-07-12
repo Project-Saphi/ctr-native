@@ -56,12 +56,16 @@ void GhostReplay_ThTick(struct Thread *t)
 		return;
 	}
 
-	if (d->reserves > 0)
-	{
-		d->reserves -= gGT->elapsedTimeMS;
-		if (d->reserves < 0)
-			d->reserves = 0;
-	}
+	// NOTE(claude): Ghidra 0x8002700c-0x8002702c `lhu v0,0x3e2(s5); lhu v1,0x1d04(a0);
+	// subu; sh; sll v0,v0,0x10; bgez; sh zero` — retail decrements reserves
+	// UNCONDITIONALLY (no `> 0` guard), then clamps to 0 when the low-16 result is
+	// negative. A recent GhostReplay polish wrapped this in `if (reserves > 0)`: for the
+	// normal reserves domain [0, 0x7fff] the two are identical (reserves==0 clamps back
+	// to 0), but the guard diverges if reserves is ever negative as s16. Drop the guard
+	// to stay bit-exact with retail's unconditional subtract.
+	d->reserves -= gGT->elapsedTimeMS;
+	if (d->reserves < 0)
+		d->reserves = 0;
 
 	if ((gGT->trafficLightsTimer < 1) && (d->ghostBoolStarted == 0))
 	{
@@ -285,13 +289,18 @@ void GhostReplay_ThTick(struct Thread *t)
 					else
 						inst->animFrame = maxFrame;
 				}
+				// NOTE(claude): Ghidra asm 0x80027650 — frame byte 0 with maxFrame > 0
+				// branches to 0x80027658/0x80027684 with v1 CLEARED (animFrame = 0);
+				// only maxFrame <= 0 takes the clamp path (animFrame = numFrames-1).
+				// These two arms were previously swapped (frame-0 packets jumped the
+				// ghost's anim to its last frame instead of rewinding it).
 				else if (maxFrame > 0)
 				{
-					inst->animFrame = maxFrame;
+					inst->animFrame = 0;
 				}
 				else
 				{
-					inst->animFrame = 0;
+					inst->animFrame = maxFrame;
 				}
 
 				buffer += GHOST_SIZE_ANIMATION;

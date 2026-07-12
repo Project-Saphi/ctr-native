@@ -590,14 +590,21 @@ void UI_CupStandings_InputAndDraw(void)
 						}
 
 						// reset counter for number of times you lost cup, to zero
-						sdata->advProgress.timesLostCupRace[i] = 0;
+						// NOTE(claude): Ghidra 0x800570c0 zeroes cup.trackIndex, then
+						// 0x800571e4/0x800571f4 (lw v0,0x1e5c; sb zero,0x42(v0)) index
+						// timesLostCupRace by trackIndex — ALWAYS slot 0, not [cupID]
+						// (ND quirk: one shared loss counter). Project used [cupID],
+						// diverging for adventure cups 1-3.
+						sdata->advProgress.timesLostCupRace[gGT->cup.trackIndex] = 0;
 					}
 
 					// If player 1 did not win the cup
 					else
 					{
-						if (sdata->advProgress.timesLostCupRace[i] < 10)
-							sdata->advProgress.timesLostCupRace[i]++;
+						// NOTE(claude): Ghidra 0x800571fc-0x80057220 — same trackIndex(=0)
+						// slot as the reset path (lw v1,0x1e5c; lb/sb 0x42(v1)), not [cupID].
+						if (sdata->advProgress.timesLostCupRace[gGT->cup.trackIndex] < 10)
+							sdata->advProgress.timesLostCupRace[gGT->cup.trackIndex]++;
 					}
 				}
 

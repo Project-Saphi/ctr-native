@@ -52,8 +52,14 @@ void VehTurbo_ThDestroy(struct Thread *t)
 	struct Driver *d = turboObj->driver;
 	d->actionsFlagSet &= ~ACTION_TURBO_ITEM;
 
-	INSTANCE_Death(t->inst);
+	// NOTE(claude): Ghidra 0x800693a0-0x800693b0 — retail frees turbo->inst
+	// (`lw a0,0x0(a1)` = Turbo+0) FIRST, then t->inst (`lw a0,0x34(s0)` =
+	// thread+0x34). The project had these two INSTANCE_Death calls swapped.
+	// INSTANCE_Death unlinks the instance from its list and frees it; matching
+	// the binary's order removes any list-mutation ordering hazard between the
+	// two flame instances.
 	INSTANCE_Death(turboObj->inst);
+	INSTANCE_Death(t->inst);
 }
 
 static void VehTurbo_TransformOffset(struct Instance *driverInst, s16 x, s16 y, s16 z, VECTOR *out)

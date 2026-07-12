@@ -17,7 +17,10 @@ void LOAD_Hub_ReadFile(struct BigHeader *bigfile, int levID, int packID)
 	MEMPACK_SwapPacks(packID);
 	MEMPACK_ClearLowMem();
 
-	sdata->PatchMem_Size = 1;
+	// NOTE(claude): Ghidra 0x80033064 `sw a1,0x138(gp)` = 0x8008d0a4 =
+	// load_inProgress (PatchMem_Size is 0x8008d094) — retail flags the load
+	// as in-progress here (gates XA in CDSYS); the LOAD callbacks clear it.
+	sdata->load_inProgress = 1;
 	gGT->level2 = 0;
 	gGT->levID_in_each_mempack[packID] = levID;
 
@@ -172,10 +175,13 @@ void LOAD_Hub_Main(struct BigHeader *bigfilePtr)
 			u32 currLevelID = gGT->levelID - GEM_STONE_VALLEY;
 
 			// ctr hubs are 0-4
-			if (currLevelID >= 5)
-				return;
-
-			LOAD_Hub_ReadFile(bigfilePtr, LOAD_HUB_CONNECTED_LEV(currLevelID, nextLevelID - 1), 3 - gGT->activeMempackIndex);
+			// NOTE(claude): Ghidra 0x80033318 — retail only branches over this
+			// player's Hub_ReadFile when not in a hub; it does not return, so
+			// later players' swap triggers are still processed.
+			if (currLevelID < 5)
+			{
+				LOAD_Hub_ReadFile(bigfilePtr, LOAD_HUB_CONNECTED_LEV(currLevelID, nextLevelID - 1), 3 - gGT->activeMempackIndex);
+			}
 		}
 	}
 }

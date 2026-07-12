@@ -32,7 +32,9 @@ void LOAD_HowlCallback(CdlIntrResult result, u8 *unk)
 	// disable callback
 	CdReadCallback(0);
 
-	if (result == CdlComplete)
+	// NOTE(claude): Ghidra 0x8003254c compares `intr & 0xff` (andi) against
+	// CdlComplete, same as LOAD_ReadFileASyncCallback — mask before comparing.
+	if ((result & 0xff) == CdlComplete)
 		sdata->howlChainState = 0;
 	else
 		sdata->howlChainState = -1;

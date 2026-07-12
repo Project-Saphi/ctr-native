@@ -419,8 +419,11 @@ void UI_RaceEnd_MenuProc(struct RectMenu *menu)
 		// Set Load/Save to Ghost mode
 		SelectProfile_ToggleMode(0x31);
 
-		// Change active Menu to GhostSelection
-		sdata->ptrActiveMenu = &data.menuGhostSelection;
+		// NOTE(claude): Ghidra 0x80055f0c `sw ...,ptrDesiredMenuBox` — retail writes
+		// the DESIRED-menu slot (same global the other menu procs use), letting the
+		// RECTMENU core perform the swap into ptrActiveMenu; writing ptrActiveMenu
+		// directly bypassed that transition (same bug as MainFreeze_MenuPtrQuit).
+		sdata->ptrDesiredMenu = &data.menuGhostSelection;
 		break;
 	}
 
@@ -429,6 +432,14 @@ void UI_RaceEnd_MenuProc(struct RectMenu *menu)
 	{
 		// go to battle setup screen
 		sdata->mainMenuState = MAIN_MENU_BATTLE_SETUP;
+
+		// when loading is done
+		// add flag for "in menus"
+		// NOTE(claude): Ghidra 0x80055ff4 (ori v0,v0,0x2000; sw v0,-0x2f00(at)
+		// -> 0x8008d100 = Loading.OnBegin.AddBitsConfig0) — retail's options
+		// 5/6/10 all fall through this shared tail before RequestLoad(0x27);
+		// project case 10 omitted the "in menus" flag that cases 5/6 set.
+		sdata->Loading.OnBegin.AddBitsConfig0 |= 0x2000;
 
 		// load LEV of main menu
 		MainRaceTrack_RequestLoad(0x27);

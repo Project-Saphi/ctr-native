@@ -189,7 +189,12 @@ void MM_Title_MenuUpdate(void)
 			gGT->boolDemoMode = 1;
 
 			// set number of players to 1
-			gGT->numPlyrCurrGame = 1;
+			// NOTE(claude): Ghidra 0x800abf78 `sb v0,0x1ca9(gGT)` writes numPlyrNextGame
+			// (0x1ca9), not numPlyrCurrGame (0x1ca8). Demo mode configures the NEXT game
+			// (the demo race being loaded); the prior write set the current menu game's
+			// count, leaving numPlyrNextGame stale so the demo could load with the wrong
+			// player count. Write numPlyrNextGame to match retail.
+			gGT->numPlyrNextGame = 1;
 
 			// 60 seconds
 			gGT->demoCountdownTimer = 1800;

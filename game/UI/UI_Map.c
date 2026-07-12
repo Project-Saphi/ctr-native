@@ -35,7 +35,11 @@ void UI_Map_DrawMap(struct Icon *mapTop, struct Icon *mapBottom, s16 posX, s16 p
 		transparency = 0;
 	}
 
-	if (gGT->level1->ptrSpawnType1 != 0)
+	// NOTE(claude): Ghidra 0x8004d614 — retail's guard tests
+	// ptrSpawnType1->count (lw +0), not the pointer itself; count==0 must
+	// leave iVar9 = 0. The pointer null-check is kept as the native low-RAM
+	// guard (PSX tolerates the null read).
+	if ((gGT->level1->ptrSpawnType1 != 0) && (gGT->level1->ptrSpawnType1->count != 0))
 	{
 		void **pointers = ST1_GETPOINTERS(gGT->level1->ptrSpawnType1);
 		iVar9 = (int)pointers[ST1_MAP];
@@ -254,15 +258,15 @@ void UI_Map_DrawDrivers(int ptrMap, struct Thread *bucket, s16 *param_3)
 	struct Driver *d;
 	struct GameTracker *gGT = sdata->gGT;
 
-	// if 2P or 4P
-	if ((gGT->numPlyrCurrGame & 1) == 0)
-	{
-		// quit, no map drawn
-		return;
-	}
-
 	for (/* bucket */; bucket != 0; bucket = bucket->siblingThread, *param_3 = *param_3 + 1)
 	{
+		// NOTE(claude): Ghidra 0x8004dd5c — the odd-player-count test sits
+		// INSIDE retail's loop: 2P/4P still walk the list and bump *param_3
+		// once per thread; only the drawing is skipped. The old early return
+		// left the caller's counter unadvanced.
+		if ((gGT->numPlyrCurrGame & 1) == 0)
+			continue;
+
 		// Player structure
 		d = bucket->object;
 

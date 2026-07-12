@@ -53,7 +53,10 @@ int OtherFX_Play_LowLevel(u32 soundID, u8 boolAntiSpam, u32 flags)
 	struct GameTracker *gGT = sdata->gGT;
 	struct ChannelStats *channel;
 	int count;
-	s16 id;
+	// NOTE(claude): Ghidra 0x800284d0 bounds-checks `(soundID & 0xffff) <
+	// numOtherFX` UNSIGNED; as s16, ids >= 0x8000 went negative, passed the
+	// check, and indexed howl_metaOtherFX out of bounds.
+	u16 id;
 	struct OtherFX *ptrOtherFX;
 	u32 LR = (flags) & 0xff;
 	u32 distortion = (flags >> 8) & 0xff;

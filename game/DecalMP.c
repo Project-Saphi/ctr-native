@@ -47,8 +47,12 @@ void DecalMP_01(struct GameTracker *gGT)
 				continue;
 
 			struct Instance *inst = driver->instSelf;
-			struct InstDrawPerPlayer *idpp = DecalMP_GetIdpp(inst, cameraID);
-			idpp->instFlags |= 0x300;
+
+			// NOTE(claude): Ghidra 0x800234f4 `lw v0,0x28(a3); ori v0,0x300; sw v0,0x28(a3)` —
+			// retail ORs PUSHBUFFER_EXISTS|PIXEL_LOD into the fixed instance-level flags
+			// (inst+0x28), not the per-camera idpp copy (inst+0xb8+cam*0x88); writing idpp
+			// here left inst->flags unset and polluted every camera's idpp flags.
+			inst->flags |= (PUSHBUFFER_EXISTS | PIXEL_LOD);
 
 			if (driverID == cameraID)
 				continue;
@@ -72,6 +76,8 @@ void DecalMP_01(struct GameTracker *gGT)
 			entry->pb.ptrOT = pb->ptrOT;
 			entry->pb.cameraID = pb->cameraID;
 
+			// Per-camera link is camera-indexed in retail (`sw v1,0x74(a3+t3)`, t3 = cam*0x88).
+			struct InstDrawPerPlayer *idpp = DecalMP_GetIdpp(inst, cameraID);
 			idpp->pushBuffer = &entry->pb;
 			entry->inst = inst;
 		}
@@ -175,10 +181,16 @@ void DecalMP_03(struct GameTracker *gGT)
 		POLY_FT4 *poly = gGT->backBuffer->primMem.cursor;
 		poly->code = 0x2d;
 
-		s16 x = entry->pb.rect.x;
-		s16 y = entry->pb.rect.y;
-		s16 w = entry->pb.rect.w;
-		s16 h = entry->pb.rect.h;
+		// NOTE(claude): Ghidra 0x80023784 reads the quad corners from pEntry+4..10 =
+		// pb+0x100..0x106 (renderBucketScreenPos/Size — the kart's projected bucket
+		// rect), the same loads that feed the SetDrawEnv offsets and renderW/H above.
+		// pb.rect (pb+0x1c) is the viewport rect copied in DecalMP_01 and is never
+		// what retail composites at; using it stretched the kart texture over the
+		// whole viewport.
+		s16 x = (s16)entry->pb.renderBucketScreenPos;
+		s16 y = (s16)(entry->pb.renderBucketScreenPos >> 16);
+		s16 w = (s16)entry->pb.renderBucketScreenSize;
+		s16 h = (s16)(entry->pb.renderBucketScreenSize >> 16);
 
 		CtrGpu_WritePackedXY(&poly->x0, (u16)x | ((u32)(u16)y << 16));
 		CtrGpu_WritePackedXY(&poly->x1, (u16)(x + w) | ((u32)(u16)y << 16));

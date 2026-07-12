@@ -25,6 +25,12 @@ void UI_Weapon_DrawSelf(s16 posX, s16 posY, s16 scale, struct Driver *d)
 	{
 		iconID = itemID + 5;
 
+		// NOTE(claude): Ghidra 0x80050998 (sb) — retail writes the quantity
+		// digit into the shared buffer UNCONDITIONALLY here, before the
+		// mask/juiced/flicker logic (even when qty==0 or the flicker skips
+		// the draw); only the DrawLine below is gated on qty != 0.
+		sdata->s_spacebar[0] = d->numHeldItems + '0';
+
 		// character ID
 		currChar = data.characterIDs[d->driverID];
 
@@ -56,10 +62,6 @@ void UI_Weapon_DrawSelf(s16 posX, s16 posY, s16 scale, struct Driver *d)
 		// If this weapon has a quantity (3 missiles)
 		if (d->numHeldItems != 0)
 		{
-			// Get the ascii character to represent the quantity
-			// of weapon that you have (3 missiles)
-			sdata->s_spacebar[0] = d->numHeldItems + '0';
-
 			// Draw the number near the weapon icon to show how many
 			DecalFont_DrawLine(sdata->s_spacebar, (int)posX, (int)posY, 2, 4);
 		}

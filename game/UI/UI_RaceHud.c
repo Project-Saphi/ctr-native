@@ -69,7 +69,9 @@ void UI_BattleDrawHeadArrows(struct Driver *player)
 
 		// If currentDriver more than 768 units away from this player,
 		// don't draw that driver's arrow
-		if (0x90000 > playerDistance)
+		// NOTE(claude): Ghidra 0x8004f9d8 — retail draws strictly when
+		// dist² > 0x90000; equality is skipped too.
+		if (0x90000 >= playerDistance)
 			continue;
 
 		// load input vector
@@ -104,7 +106,9 @@ void UI_BattleDrawHeadArrows(struct Driver *player)
 
 		sVar4 = outXY[0];
 		sVar5 = outXY[1] + sVar1;
-		iVar6 = (0x1000 - ((playerDistance / 6 + (playerDistance >> 0x1f) >> 0xd) - (playerDistance >> 0x1f)));
+		// NOTE(claude): Ghidra 0x8004f9d8 — retail truncates the size base to
+		// s16 before the ×3/×7 scaling; matters for very large distances.
+		iVar6 = (s16)(0x1000 - ((playerDistance / 6 + (playerDistance >> 0x1f) >> 0xd) - (playerDistance >> 0x1f)));
 		sVar1 = (s16)(iVar6 * 3 >> 10);
 		sVar3 = (s16)(iVar6 * 7 >> 12) + 12;
 
@@ -118,13 +122,14 @@ void UI_BattleDrawHeadArrows(struct Driver *player)
 		// Battle Team of this driver
 		currTeam = currDriver->BattleHUD.teamID;
 
-		// color data
-		color = *(u32 *)data.ptrColor[PLAYER_BLUE + currTeam];
-
-		// it's all the same color
-		*(int *)&p->g3.r0 = (color & 0xffffff) | 0x30000000;
-		*(int *)&p->g3.r1 = color | 0x30000000;
-		*(int *)&p->g3.r2 = color | 0x30000000;
+		// NOTE(claude): Ghidra 0x8004f9d8 — retail reads three consecutive
+		// gradient words (+0/+4/+8) from ptrColor[PLAYER_BLUE+team]; reusing
+		// word 0 for r1/r2 flattened the arrow's gouraud gradient (same bug
+		// family as MainFreeze ConfigDrawArrows).
+		u32 *grad = (u32 *)data.ptrColor[PLAYER_BLUE + currTeam];
+		*(int *)&p->g3.r0 = (grad[0] & 0xffffff) | 0x30000000;
+		*(int *)&p->g3.r1 = grad[1] | 0x30000000;
+		*(int *)&p->g3.r2 = grad[2] | 0x30000000;
 
 		u_long *ot = gGT->pushBuffer[playerID].ptrOT;
 
@@ -240,7 +245,13 @@ LAB_8004fe8c:
 	// set pointer of the missile or warpball chasing the player
 	d->thTrackingMe = trackerTh;
 
-	if (timer != 0)
+	// NOTE(claude): Ghidra 0x8004fea0 `lh v0,0x0(a0)` (a0 = &trackerTimer[driverId])
+	// — retail RE-READS trackerTimer[driverid] for this guard; it does NOT reuse the
+	// value cached at function entry. On a fresh lock the state machine above just
+	// reset trackerTimer to 8/12; retail decrements that (→7/11) the same frame, but
+	// the cached `timer` was still 0 (pre-reset) so the old guard skipped the tick and
+	// the tracker pulse animation ran one frame behind. Re-read the current value.
+	if (data.trackerTimer[driverid] != 0)
 	{
 		data.trackerTimer[driverid]--;
 	}
@@ -424,7 +435,12 @@ LAB_8004fe8c:
 			*(int *)&p->r1 = rgb1;
 			*(int *)&p->r2 = rgb2;
 
-			*(int *)&p->x0 = *(int *)&pLast->x0;
+			// NOTE(claude): Ghidra 0x80050374 (sh v0,0xa) — the second (lower)
+			// triangle's y0 is screenPosY-12 in retail, NOT a copy of the first
+			// triangle's y0 (screenPosY-(h+12)); copying the word doubled the
+			// chevron's height upward.
+			p->x0 = pLast->x0;
+			p->y0 = screenPosY - 12;
 			*(int *)&p->x1 = *(int *)&pLast->x1;
 			p->x2 = pLast->x2;
 

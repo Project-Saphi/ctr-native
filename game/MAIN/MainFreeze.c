@@ -50,7 +50,7 @@ void MainFreeze_ConfigDrawArrows(s16 offsetX, s16 offsetY, char *str)
 {
 	int lineWidth;
 	int color;
-	u8 **colorPtr;
+	u32 *colorWords;
 	struct GameTracker *gGT = sdata->gGT;
 
 	// orange color
@@ -65,7 +65,11 @@ void MainFreeze_ConfigDrawArrows(s16 offsetX, s16 offsetY, char *str)
 	lineWidth = DecalFont_GetLineWidth(str, 1) >> 1;
 
 	// get color data
-	colorPtr = (u8 **)&data.ptrColor[color];
+	// NOTE(claude): Ghidra 0x80037bc0 — retail passes the 4 gradient WORDS of
+	// the selected color (ptrColor[color] → data.colors[color][0..3], 16-byte
+	// entries); deref'ing four consecutive ptrColor entries instead read byte
+	// 0 of four different colors.
+	colorWords = (u32 *)data.ptrColor[color];
 
 	struct Icon **iconPtrArray = ICONGROUP_GETICONS(gGT->iconGroup[4]);
 
@@ -83,7 +87,7 @@ void MainFreeze_ConfigDrawArrows(s16 offsetX, s16 offsetY, char *str)
 	    gGT->pushBuffer_UI.ptrOT,
 
 	    // color data
-	    *colorPtr[0], *colorPtr[1], *colorPtr[2], *colorPtr[3],
+	    colorWords[0], colorWords[1], colorWords[2], colorWords[3],
 
 	    0, FP(1.0), 0x800);
 
@@ -101,7 +105,7 @@ void MainFreeze_ConfigDrawArrows(s16 offsetX, s16 offsetY, char *str)
 	    gGT->pushBuffer_UI.ptrOT,
 
 	    // color data
-	    *colorPtr[0], *colorPtr[1], *colorPtr[2], *colorPtr[3],
+	    colorWords[0], colorWords[1], colorWords[2], colorWords[3],
 
 	    0, FP(1.0), 0);
 
@@ -457,7 +461,10 @@ force_inline int PROCESSINPUTS_MainFreeze_MenuPtrOptions(struct RectMenu *menu, 
 			OptionsMenu_TestSound(menu->rowSelected, 1);
 			if (sdata->AnyPlayerHold & (BTN_LEFT | BTN_RIGHT))
 			{
-				int volume = howl_VolumeGet(menu->rowSelected);
+				// NOTE(claude): Ghidra 0x80038fd0 — retail masks the returned
+				// volume to 8 bits before the ±4 step (as the slider drawing
+				// below also does).
+				int volume = howl_VolumeGet(menu->rowSelected) & 0xff;
 
 				if (sdata->AnyPlayerHold & BTN_LEFT)
 				{
@@ -800,7 +807,11 @@ void MainFreeze_MenuPtrQuit(struct RectMenu *menu)
 
 		if ((row == 1) || (row == -1))
 		{
-			sdata->ptrActiveMenu = MainFreeze_GetMenuPtr();
+			// NOTE(claude): Ghidra 0x80039908 — retail writes the DESIRED-menu
+			// slot (same global the Options/Default procs use), letting the
+			// RECTMENU core perform the swap; writing ptrActiveMenu directly
+			// bypassed that transition.
+			sdata->ptrDesiredMenu = MainFreeze_GetMenuPtr();
 		}
 	}
 	else
@@ -1078,51 +1089,46 @@ void MainFreeze_MenuPtrDefault(struct RectMenu *menu)
 	return;
 }
 
-extern int mainFreezeFlags[5];
-extern struct RectMenu *mainFreezeMenuArr[5];
-
 // NOTE(aalhendi): ASM-verified NTSC-U 926 0x80039dcc-0x80039e98.
+// NOTE(claude): Ghidra 0x80039dcc — retail's priority is ADVENTURE_ARENA >
+// ADVENTURE_MODE (advCup when ADVENTURE_CUP) > BATTLE_MODE > gameMode2 cups >
+// arcade race, and the AdvHub hint-row string is only written inside the
+// arena branch; the previous table-driven order (cup check hoisted, BATTLE
+// first) picked different menus whenever mode bits overlap and ran the
+// MaskBoolGoodGuy side effect unconditionally.
 struct RectMenu *MainFreeze_GetMenuPtr(void)
 {
 	struct GameTracker *gGT = sdata->gGT;
 
-	// Set string to "Uka Uka Hints",
-	// or if boolGoodGuy, then set "Aku Aku Hints"
-	int var1 = 0xc;
-	if (VehPickupItem_MaskBoolGoodGuy(gGT->drivers[0]) != 0)
-		var1 = 0xb;
+	if ((gGT->gameMode1 & ADVENTURE_ARENA) != 0)
+	{
+		// Set string to "Uka Uka Hints",
+		// or if boolGoodGuy, then set "Aku Aku Hints"
+		int var1 = 0xc;
+		if (VehPickupItem_MaskBoolGoodGuy(gGT->drivers[0]) != 0)
+			var1 = 0xb;
 
-	data.rowsAdvHub[1].stringIndex = var1;
+		data.rowsAdvHub[1].stringIndex = var1;
+
+		return &data.menuAdvHub;
+	}
+
+	if ((gGT->gameMode1 & ADVENTURE_MODE) != 0)
+	{
+		if ((gGT->gameMode1 & ADVENTURE_CUP) != 0)
+			return &data.menuAdvCup;
+
+		return &data.menuAdvRace;
+	}
+
+	if ((gGT->gameMode1 & BATTLE_MODE) != 0)
+		return &data.menuBattle;
 
 	if ((gGT->gameMode2 & CUP_ANY_KIND) != 0)
-	{
 		return &data.menuArcadeCup;
-	}
 
-	u32 gameMode = gGT->gameMode1;
-	int *flagPtr = &mainFreezeFlags[0];
-	struct RectMenu **menuPtrToPtr = &mainFreezeMenuArr[0];
-
-	for (
-	    /**/; *flagPtr != 0;
-
-	    flagPtr++, menuPtrToPtr++)
-	{
-		if ((gameMode & (*flagPtr)) != 0)
-			break;
-	}
-
-	// if nothing else,
-	// then menuArcadeRace
-	return (*menuPtrToPtr);
+	return &data.menuArcadeRace;
 }
-
-int mainFreezeFlags[5] = {
-    BATTLE_MODE, ADVENTURE_ARENA, ADVENTURE_CUP, ADVENTURE_MODE,
-    0 // null terminator
-};
-
-struct RectMenu *mainFreezeMenuArr[5] = {&data.menuBattle, &data.menuAdvHub, &data.menuAdvCup, &data.menuAdvRace, &data.menuArcadeRace};
 
 // NOTE(aalhendi): ASM-verified NTSC-U 926 0x80039e98-0x80039fa8.
 void MainFreeze_IfPressStart(void)

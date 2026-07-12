@@ -318,11 +318,15 @@ void UI_INSTANCE_InitAll(void)
 		relicTime = data.RelicTime[gGT->levelID * 3 + relicType];
 
 		// store globally for HUD to access later
+		// NOTE(claude): Ghidra 0x8004cec4 — retail's fractional digits are
+		// tenths ((t/0x60)%10) and hundredths ((t*100)/0x3c0%10), matching
+		// RECTMENU_DrawTime's fields; the old *100/*1000 forms shifted the
+		// displayed relic target time one decimal place.
 		sdata->relicTime_1min = relicTime / 0xe100;
 		sdata->relicTime_10sec = (relicTime / 0x2580) % 6;
 		sdata->relicTime_1sec = (relicTime / 0x3c0) % 10;
-		sdata->relicTime_10ms = ((relicTime * 100) / 0x3c0) % 10;
-		sdata->relicTime_1ms = ((relicTime * 1000) / 0x3c0) % 10;
+		sdata->relicTime_10ms = (relicTime / 0x60) % 10;
+		sdata->relicTime_1ms = ((relicTime * 100) / 0x3c0) % 10;
 
 		return;
 	}

@@ -394,6 +394,11 @@ void Voiceline_SetDefaults(void)
 	sdata->audioState = AUDIO_NONE;
 	sdata->desiredXA_RaceIntroIndex = 0;
 
+	// NOTE(claude): Ghidra 0x8002d2b0 also zeroes desiredXA_FinalLapIndex
+	// (retail 0x8008d7f4; unused field, but retail stores it — kept for
+	// asm fidelity).
+	sdata->desiredXA_FinalLapIndex = 0;
+
 	sdata->WrongWayDirection_bool = false;
 
 	sdata->framesDrivingSameDirection = 0;

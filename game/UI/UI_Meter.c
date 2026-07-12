@@ -144,8 +144,10 @@ void UI_JumpMeter_Draw(s16 posX, s16 posY, struct Driver *driver)
 	if (p != 0)
 	{
 		*(u32 *)&p->r0 = 0x28ffffff;
-		p->x1 = posX + 13;
-		p->x3 = posX + 13;
+		// NOTE(claude): Ghidra 0x80051e24 — retail's frame-fill right edge is
+		// posX + 0xe (14), not 13.
+		p->x1 = posX + 14;
+		p->x3 = posX + 14;
 		p->x0 = box.x;
 		p->y0 = box.y;
 		p->y1 = box.y;

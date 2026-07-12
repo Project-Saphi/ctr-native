@@ -167,19 +167,18 @@ void CS_Camera_ThTick_Podium(struct Thread *th)
 
 		MainRaceTrack_RequestLoad(CHECK_ADV_BIT(sdata->advProgress.rewards, ADV_REWARD_BEAT_OXIDE_SECOND) ? OXIDE_TRUE_ENDING : OXIDE_ENDING);
 
+		// NOTE(claude): Ghidra 0x800af16c/0x800af174 (`ori v0,v0,0x800; sw v0,0x1c(s2)`)
+		// — the retail STATIC_BIG1 path DOES kill the podium thread unconditionally,
+		// the same as the normal-exit path. The prior code gated the kill on CTR_NATIVE
+		// with a NOTE claiming retail leaves it alive; the 926 asm disproves that, so the
+		// non-native build was missing the kill. Kill unconditionally to match retail.
 #if defined(CTR_NATIVE)
-		// NOTE(aalhendi): The STATIC_BIG1 path does not kill the podium thread
-		// (unlike the normal-exit path). On the next tick the podium re-enters
-		// with podiumRewardID == NOFUNC and falls into the boss-camera
-		// path. On retail PSX this is invisible: the checkered flag
-		// transition covers the screen, and CD-ROM model loading in CS_LoadBoss
-		// is slow enough that LOADING engages before boss threads can emit audio
-		// or visuals. Native's faster I/O lets the boss camera
-		// spawn threads and play audio before the checkered flag finishes, so kill
-		// the thread here to prevent the re-entry entirely.
+		// NOTE(aalhendi): Native's faster I/O can let a stray re-entry spawn boss
+		// threads before the checkered-flag transition covers the screen; force the
+		// cutscene-over flag so any sibling cutscene threads also die this frame.
 		D233.isCutsceneOver = 1;
-		th->flags |= THREAD_FLAG_DEAD;
 #endif
+		th->flags |= THREAD_FLAG_DEAD;
 		return;
 	}
 

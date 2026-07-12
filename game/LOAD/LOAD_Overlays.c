@@ -14,7 +14,10 @@ void LOAD_OvrLOD(u32 param_1)
 	{
 #ifndef CTR_NATIVE
 		// LOD overlay 226-229
-		LOAD_AppendQueue(0, LT_SETADDR, BI_OVERLAYSECT2 + param_1, &OVR_Region2, LOAD_Callback_Overlay_Generic);
+		// NOTE(claude): Ghidra 0x80033474 — retail sets load_inProgress=1 (the
+		// overlay callback clears it) and passes ptrBigfileCdPos_2, not NULL.
+		sdata->load_inProgress = 1;
+		LOAD_AppendQueue(sdata->ptrBigfileCdPos_2, LT_SETADDR, BI_OVERLAYSECT2 + param_1, &OVR_Region2, LOAD_Callback_Overlay_Generic);
 #endif
 
 		// save ID, and reload next overlay (sector read invalidation)
@@ -35,7 +38,10 @@ void LOAD_OvrEndRace(u32 param_1)
 	{
 #ifndef CTR_NATIVE
 		// EndOfRace overlay 221-225
-		LOAD_AppendQueue(0, LT_SETADDR, BI_OVERLAYSECT1 + param_1, &OVR_Region1, LOAD_Callback_Overlay_Generic);
+		// NOTE(claude): Ghidra 0x800334f4 — retail sets load_inProgress=1 and
+		// passes ptrBigfileCdPos_2, not NULL (same pattern as LOAD_OvrLOD).
+		sdata->load_inProgress = 1;
+		LOAD_AppendQueue(sdata->ptrBigfileCdPos_2, LT_SETADDR, BI_OVERLAYSECT1 + param_1, &OVR_Region1, LOAD_Callback_Overlay_Generic);
 #endif
 
 		gGT->overlayIndex_EndOfRace = param_1;
@@ -77,7 +83,10 @@ void LOAD_OvrThreads(u32 param_1)
 #ifndef CTR_NATIVE
 		gGT->overlayIndex_Threads = 0xff;
 		// Threads overlay 230-233
-		LOAD_AppendQueue(0, LT_SETADDR, (param_1 + 0xe6), &OVR_Region3, data.overlayCallbackFuncs[param_1]);
+		// NOTE(claude): Ghidra 0x80033570 — retail sets load_inProgress=1 and
+		// passes ptrBigfileCdPos_2, not NULL (per-overlay callback clears it).
+		sdata->load_inProgress = 1;
+		LOAD_AppendQueue(sdata->ptrBigfileCdPos_2, LT_SETADDR, (param_1 + 0xe6), &OVR_Region3, data.overlayCallbackFuncs[param_1]);
 #else
 		// NOTE(aalhendi): Native overlays are already linked, so reset the
 		// overlay-owned data that retail would refresh by streaming into OVR_Region3.

@@ -136,6 +136,11 @@ void FLARE_ThTick(struct Thread *th)
 	CtrGpu_WritePackedXY(&p1->x1, MFC2(13));
 	CtrGpu_WritePackedXY(&p1->x0, MFC2(14));
 
+	// NOTE(claude): Ghidra swc2 offsets 0x80024f9c-0x8002500c — the middle grid row
+	// feeds p1/p2/p3's xy2/xy3 (with p1.xy3←SXY1, p1.xy2←SXY2), and the bottom row
+	// (below) feeds p2/p3's xy0/xy1: each quadrant's UVs are mirrored away from the
+	// flare center. The previous slot assignment produced self-crossing (bowtie)
+	// quads for p1/p3 and an unmirrored p2.
 	FLARE_LoadGridRow(0);
 	gte_rtpt();
 	FLARE_WriteColors(p0);
@@ -143,12 +148,12 @@ void FLARE_ThTick(struct Thread *th)
 	FLARE_WriteTexture(p2, icon, texWord1);
 	CtrGpu_WritePackedXY(&p0->x2, MFC2(12));
 	CtrGpu_WritePackedXY(&p0->x3, MFC2(13));
-	CtrGpu_WritePackedXY(&p1->x2, MFC2(13));
-	CtrGpu_WritePackedXY(&p1->x3, MFC2(14));
-	CtrGpu_WritePackedXY(&p2->x0, MFC2(12));
-	CtrGpu_WritePackedXY(&p2->x1, MFC2(13));
-	CtrGpu_WritePackedXY(&p3->x1, MFC2(13));
-	CtrGpu_WritePackedXY(&p3->x0, MFC2(14));
+	CtrGpu_WritePackedXY(&p1->x3, MFC2(13));
+	CtrGpu_WritePackedXY(&p1->x2, MFC2(14));
+	CtrGpu_WritePackedXY(&p2->x2, MFC2(12));
+	CtrGpu_WritePackedXY(&p2->x3, MFC2(13));
+	CtrGpu_WritePackedXY(&p3->x3, MFC2(13));
+	CtrGpu_WritePackedXY(&p3->x2, MFC2(14));
 	s32 depth = MFC2(18);
 
 	FLARE_LoadGridRow(409);
@@ -156,10 +161,10 @@ void FLARE_ThTick(struct Thread *th)
 	FLARE_WriteColors(p2);
 	FLARE_WriteColors(p3);
 	FLARE_WriteTexture(p3, icon, texWord1);
-	CtrGpu_WritePackedXY(&p2->x2, MFC2(12));
-	CtrGpu_WritePackedXY(&p2->x3, MFC2(13));
-	CtrGpu_WritePackedXY(&p3->x2, MFC2(13));
-	CtrGpu_WritePackedXY(&p3->x3, MFC2(14));
+	CtrGpu_WritePackedXY(&p2->x0, MFC2(12));
+	CtrGpu_WritePackedXY(&p2->x1, MFC2(13));
+	CtrGpu_WritePackedXY(&p3->x1, MFC2(13));
+	CtrGpu_WritePackedXY(&p3->x0, MFC2(14));
 
 	depth = (depth >> 8) - 2;
 	if (depth < 0)

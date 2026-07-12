@@ -94,7 +94,11 @@ struct ChannelStats *Channel_AllocSlot_AntiSpam(s16 soundID, char boolUseAntiSpa
 			    // matching ID
 			    ((curr->soundID & 0xffff) == ((u16)soundID)))
 			{
-				int duration = sdata->gGT->frameTimer_MainFrame_ResetDB - curr->startFrame;
+				// NOTE(claude): Ghidra 0x8002b608 compares `(uint)(now - startFrame)
+				// < 10` — UNSIGNED. With a signed compare, a stale channel whose
+				// startFrame is ahead of the timer (negative difference, e.g. after
+				// a frame-counter reset) was wrongly treated as recent and destroyed.
+				u32 duration = (u32)(sdata->gGT->frameTimer_MainFrame_ResetDB - curr->startFrame);
 
 				// if started within 10 frames, cancel old and start new,
 				// otherwise you'll allocate too many sounds and overflow

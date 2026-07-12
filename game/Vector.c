@@ -73,6 +73,11 @@ void Vector_SpecLightSpin3D(struct Instance *inst, s16 *rot, const SVec3 *lightD
 
 	for (int i = 0; i < gGT->numPlyrCurrGame; i++)
 	{
+		// NOTE(claude): Ghidra 0x80057484-0x8005748c advances TWO 0x110 cursors
+		// (pos + light-matrix) and sums them, so retail's per-player camera matrix
+		// strides 0x220 (reads pushBuffer[2*i].matrix_Camera) while pos strides
+		// 0x110 — an ND cursor bug that only matches this pushBuffer[i] at player 0.
+		// Left as pushBuffer[i]: reproducing 0x220 reads OOB pushBuffers for 3-4P.
 		struct PushBuffer *pb = &gGT->pushBuffer[i];
 		SVec3 lightCamera;
 		SVec3 lightLocal;
@@ -111,7 +116,11 @@ void Vector_SpecLightNoSpin3D(struct Instance *inst, s16 *rot, const SVec3 *ligh
 	struct GameTracker *gGT = sdata->gGT;
 	struct InstDrawPerPlayer *idpp = INST_GETIDPP(inst);
 
-	ConvertRotToMatrix(&lightMatrix, rot);
+	// NOTE(claude): Ghidra 0x800576dc jal 0x8006c378 — retail calls
+	// ConvertRotToMatrix_Transpose here (like the Spin siblings), not
+	// ConvertRotToMatrix (0x8006c2a4). The non-transpose builds a different
+	// light matrix → wrong specular shine on non-spinning shiny objects.
+	ConvertRotToMatrix_Transpose(&lightMatrix, rot);
 	Vector_LightMatrixMul(&lightMatrix, &light, &lightLocal);
 
 	inst->unk53 = (char)lightLocal.x;

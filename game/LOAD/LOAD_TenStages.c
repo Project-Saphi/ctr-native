@@ -176,19 +176,23 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 		// ========== Set LevelLOD variables ================
 
 
-		// default
-		sdata->levelLOD = gGT->numPlyrCurrGame;
+		// NOTE(claude): Ghidra 0x80033a70 — retail priority is MAIN_MENU (LOD 1)
+		// first, then TIME_TRIAL/RELIC_RACE (LOD 8), then player count; the
+		// previous order let a stale TIME_TRIAL flag override the main menu.
 
 		// main menu or adv garage
-		if ((gGT->gameMode1 & MAIN_MENU) != 0)
-		{
-			sdata->levelLOD = 1;
-		}
+		sdata->levelLOD = 1;
 
-		// if relic, or time trial
-		if ((gGT->gameMode1 & (TIME_TRIAL | RELIC_RACE)) != 0)
+		if ((gGT->gameMode1 & MAIN_MENU) == 0)
 		{
+			// if relic, or time trial
 			sdata->levelLOD = 8;
+
+			if ((gGT->gameMode1 & (TIME_TRIAL | RELIC_RACE)) == 0)
+			{
+				// default
+				sdata->levelLOD = gGT->numPlyrCurrGame;
+			}
 		}
 
 		gGT->hudFlags |= 2;
@@ -435,17 +439,21 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 		// NOTE(aalhendi): Retail sets the load gate before queueing level files.
 		sdata->load_inProgress = 1;
 
+		// NOTE(claude): Ghidra 0x80033ff0+ — retail passes the bigfile argument
+		// to all three queue calls, not NULL (NULL leans on the port-only
+		// NULL→ptrBigfile1 shim in ReadFile_ex).
+
 		// add VRAM to loading queue
-		LOAD_AppendQueue(0, LT_VRAM, LOAD_GetBigfileIndex(gGT->levelID, sdata->levelLOD, LVI_VRAM), NULL, NULL);
+		LOAD_AppendQueue(bigfile, LT_VRAM, LOAD_GetBigfileIndex(gGT->levelID, sdata->levelLOD, LVI_VRAM), NULL, NULL);
 
 		// add LEV to loading queue
-		LOAD_AppendQueue(0, LT_GETADDR, LOAD_GetBigfileIndex(gGT->levelID, sdata->levelLOD, LVI_LEV), NULL, LOAD_Callback_LEV);
+		LOAD_AppendQueue(bigfile, LT_GETADDR, LOAD_GetBigfileIndex(gGT->levelID, sdata->levelLOD, LVI_LEV), NULL, LOAD_Callback_LEV);
 
 		// NOTE(aalhendi): ASM-verified NTSC-U 926 0x800340c0-0x80034180; retail queues PTR maps by level-ID ranges.
 		if (((u32)(levelID - GEM_STONE_VALLEY) < 0xe) || ((u32)(levelID - CREDITS_CRASH) < 0x14))
 		{
 			// add PTR file to loading queue
-			LOAD_AppendQueue(0, LT_SETADDR, LOAD_GetBigfileIndex(gGT->levelID, sdata->levelLOD, LVI_PTR), (void *)sdata->PatchMem_Ptr, LOAD_Callback_PatchMem);
+			LOAD_AppendQueue(bigfile, LT_SETADDR, LOAD_GetBigfileIndex(gGT->levelID, sdata->levelLOD, LVI_PTR), (void *)sdata->PatchMem_Ptr, LOAD_Callback_PatchMem);
 		}
 		break;
 	}
@@ -489,25 +497,21 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 
 		gGT->gameMode1_prevFrame = 1;
 
-		MEMPACK_SwapPacks(0);
+		// NOTE(claude): Ghidra 0x80033610 stage 7 — retail has no
+		// MEMPACK_SwapPacks(0) here; the cutscene/arena/credits paths keep the
+		// subpack from stage 6 active. (The removed swap was not in the binary.)
 		if (((gGT->gameMode1 & (GAME_CUTSCENE | ADVENTURE_ARENA)) == 0) && ((gGT->gameMode2 & CREDITS) == 0))
 		{
 			MainInit_JitPoolsNew(gGT);
 			return loadingStage + 1;
 		}
 
-		if ((gGT->gameMode2 & LEV_SWAP) == 0)
-			break;
-
-		// === Assume LEV_SWAP Active ===
-
-		if ((gGT->gameMode1 & ADVENTURE_ARENA) == 0)
-			break;
-
-		// === Assume AdventureArena Active ===
-
 		// podium reward
-		if (gGT->podiumRewardID == 0)
+		// NOTE(claude): Ghidra stage 7 — retail gates the podium queueing on
+		// podiumRewardID alone; there are no LEV_SWAP/ADVENTURE_ARENA
+		// pre-checks in the binary (the JitPools return above already filtered
+		// to cutscene/arena/credits loads).
+		if (gGT->podiumRewardID == NOFUNC)
 			break;
 
 		// === Assume PodiumReward Active ===
@@ -523,8 +527,13 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 		// LOAD_Callback_Podiums runs after the final podium file.
 		sdata->load_inProgress = 1;
 
+		// NOTE(claude): Ghidra 0x80033610 stage 7 — every podium LOAD_AppendQueue
+		// call in retail passes the `bigfile` argument, not NULL (each decomp call is
+		// `LOAD_AppendQueue(bigfile, ...)`). Passing 0 here relied on the port-only
+		// NULL->ptrBigfile1 shim in ReadFile_ex, matching only while bigfile ==
+		// ptrBigfile1; pass bigfile explicitly to match retail (same fix as stage 6).
 		// VRAM for podium and all related models
-		LOAD_AppendQueue(0, LT_VRAM, BI_PODIUMVRMS + iVar9, NULL, NULL);
+		LOAD_AppendQueue(bigfile, LT_VRAM, BI_PODIUMVRMS + iVar9, NULL, NULL);
 
 		int fileIndex;
 		u8 *ptrIndexArr = &gGT->podium_modelIndex_First;
@@ -535,38 +544,38 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 		if ((ptrIndexArr[0] != 0) && (ptrIndexArr[0] != STATIC_OXIDEDANCE))
 		{
 			fileIndex = BI_DANCEMODELWIN + iVar9 + (ptrIndexArr[0] - STATIC_CRASHDANCE) * 2;
-			LOAD_AppendQueue(0, LT_GETADDR, fileIndex, &ptrModelPtrArr[0], setPtrCb);
+			LOAD_AppendQueue(bigfile, LT_GETADDR, fileIndex, &ptrModelPtrArr[0], setPtrCb);
 		}
 
 		// podium second place
 		if (ptrIndexArr[1] != 0)
 		{
 			fileIndex = BI_DANCEMODELLOSE + iVar9 + (ptrIndexArr[1] - STATIC_CRASHDANCE) * 2;
-			LOAD_AppendQueue(0, LT_GETADDR, fileIndex, &ptrModelPtrArr[1], setPtrCb);
+			LOAD_AppendQueue(bigfile, LT_GETADDR, fileIndex, &ptrModelPtrArr[1], setPtrCb);
 		}
 
 		// podium third place
 		if (ptrIndexArr[2] != 0)
 		{
 			fileIndex = BI_DANCEMODELLOSE + iVar9 + (ptrIndexArr[2] - STATIC_CRASHDANCE) * 2;
-			LOAD_AppendQueue(0, LT_GETADDR, fileIndex, &ptrModelPtrArr[2], setPtrCb);
+			LOAD_AppendQueue(bigfile, LT_GETADDR, fileIndex, &ptrModelPtrArr[2], setPtrCb);
 		}
 
 		// TAWNA
 		fileIndex = BI_DANCETAWNAGIRL + iVar9 + (gGT->podium_modelIndex_tawna - STATIC_TAWNA1) * 2;
 
 		// add TAWNA to loading queue
-		LOAD_AppendQueue(0, LT_GETADDR, fileIndex, (void *)&data.podiumModel_tawna, setPtrCb);
+		LOAD_AppendQueue(bigfile, LT_GETADDR, fileIndex, (void *)&data.podiumModel_tawna, setPtrCb);
 
 		// if 0x7e+5 (dingo)
 		if (gGT->podium_modelIndex_First == STATIC_DINGODANCE)
 		{
 			// add "DingoFire" to loading queue
-			LOAD_AppendQueue(0, LT_GETADDR, BI_DINGOFIRE + iVar9, (void *)&data.podiumModel_dingoFire, setPtrCb);
+			LOAD_AppendQueue(bigfile, LT_GETADDR, BI_DINGOFIRE + iVar9, (void *)&data.podiumModel_dingoFire, setPtrCb);
 		}
 
 		// add Podium
-		LOAD_AppendQueue(0, LT_GETADDR, BI_PODIUM + iVar9, NULL, LOAD_Callback_Podiums);
+		LOAD_AppendQueue(bigfile, LT_GETADDR, BI_PODIUM + iVar9, NULL, LOAD_Callback_Podiums);
 
 		// Disable LEV instances on Adv Hub, for podium scene
 		gGT->gameMode2 = gGT->gameMode2 | 0x100;

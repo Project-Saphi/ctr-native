@@ -41,8 +41,14 @@ void RB_TNT_ThTick_ThrowOnHead(struct Thread *t)
 			// Set TNT timer to 0, it blows up at 0x5a
 			mw->numFramesOnHead = 0;
 
-			// number of jumps is 7 or 8
-			mw->jumpsRemaining = 8 - (MixRNG_Scramble() & 1);
+			// number of jumps is 7 or 8 (or 9 — see NOTE)
+			// NOTE(claude): Ghidra 0x800ad7d8-f0 computes 8 - (rng % 2) via the signed
+			// truncating-modulo idiom (srl 31 / addu / sra 1 / sll 1 / subu). MixRNG_Scramble
+			// returns a signed int that can be negative, so an odd-negative result gives
+			// rng % 2 == -1 → 9 jumps. The prior `& 1` capped it at 7/8, diverging ~25% of
+			// throws. Use signed % 2 to match retail.
+			int jumpRng = MixRNG_Scramble();
+			mw->jumpsRemaining = 8 - (jumpRng % 2);
 
 			// play sound that you hit a TNT
 			PlaySound3D(0x51, inst);

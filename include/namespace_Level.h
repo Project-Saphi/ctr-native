@@ -234,8 +234,11 @@ struct QuadBlock
 
 	// 0x38
 	u8 terrain_type;
-	char weather_intensity;
-	char weather_vanishRate;
+	// NOTE(claude): Ghidra 0x80036234/0x80036280 load these lbu (zero-extend)
+	// for the rain-buffer division in MainFrame_RenderFrame — signed char
+	// would go negative for intensities >= 0x80.
+	u8 weather_intensity;
+	u8 weather_vanishRate;
 	s8 mulNormVecY; // -127 for AntiGrav Sewer
 
 	// 0x3C

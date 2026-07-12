@@ -492,10 +492,10 @@ void StateZero()
 	struct GamepadSystem *gGS;
 	gGS = sdata->gGamepads;
 
-// already zero, part of BSS
-#if 0
+	// NOTE(claude): Ghidra 0x8003c614 — retail memsets the whole GameTracker
+	// (0x2584) on every state-0 entry; BSS covers the first boot, but the PSX
+	// state-4 reboot path re-enters here with stale state.
 	memset(gGT, 0, sizeof(struct GameTracker));
-#endif
 
 	// Set Video Mode to NTSC
 	SetVideoMode(0);
@@ -558,7 +558,13 @@ void StateZero()
 	gGT->trafficLightsTimer = 0xfffffc40;
 
 	Timer_Init();
-	DrawSyncCallback(&MainDrawCb_DrawSync);
+
+	// NOTE(claude): Ghidra 0x8003c740 — retail brackets this in a critical
+	// section and saves the PREVIOUS callback into MainDrawCb_DrawSyncPtr,
+	// which MainKillGame_StopCTR restores (it was otherwise never written).
+	EnterCriticalSection();
+	sdata->MainDrawCb_DrawSyncPtr = (void *)DrawSyncCallback(&MainDrawCb_DrawSync);
+	ExitCriticalSection();
 
 	MEMCARD_InitCard();
 	VSync(0);
@@ -602,6 +608,10 @@ void StateZero()
 
 	gGT->levelID = NAUGHTY_DOG_CRATE;
 	// gGT->levelID = OXIDE_TRUE_ENDING;
+
+	// NOTE(claude): Ghidra 0x8003c7f4 — retail seeds levelName with "ndi"
+	// (word copy from the debug-name string pool @0x8008d16c).
+	memcpy(gGT->levelName, "ndi", 4);
 
 	InitGeom();
 	SetGeomOffset(0x100, 0x78); // width/2, height/2

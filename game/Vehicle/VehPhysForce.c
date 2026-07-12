@@ -163,10 +163,19 @@ void VehPhysForce_OnGravity(struct Driver *driver, Vec3 *velocity)
 
 	TerrainFlags terrainFlags = driver->terrainMeta1->flags;
 	int terminalVelocity = driver->const_TerminalVelocity;
-	if ((localY < 0) && ((terrainFlags & TERRAIN_FLAG_MUD_PHYSICS) != 0) && (originalLocalY < -0x100))
+	// NOTE(claude): Ghidra 0x8005e4cc — `li t1,0x100` is in the delay slot of the
+	// `originalLocalY < -0x100` branch (0x8005e4c8), so terminalVelocity=0x100 is
+	// set whenever (localY<0 && mud), regardless of originalLocalY; only the
+	// originalLocalY=-0x100 clamp is gated by originalLocalY<-0x100. Requiring all
+	// three let the kart sink past the 0x100 mud terminal when originalLocalY was
+	// in [-0x100, 0).
+	if ((localY < 0) && ((terrainFlags & TERRAIN_FLAG_MUD_PHYSICS) != 0))
 	{
 		terminalVelocity = 0x100;
-		originalLocalY = -0x100;
+		if (originalLocalY < -0x100)
+		{
+			originalLocalY = -0x100;
+		}
 	}
 
 	int clampedLocalY = localY;

@@ -19,7 +19,11 @@ void Podium_InitModels(struct GameTracker *gGT)
 
 		s16 rank = driver->driverRank;
 
-		if (rank < 3)
+		// NOTE(claude): Ghidra 0x80041d0c — retail dispatches ranks 0/1/2 with
+		// explicit equality arms and does nothing for negative ranks; an
+		// unguarded rank<3 would let a stray -1 write the byte before the
+		// podium index array.
+		if ((rank >= 0) && (rank < 3))
 		{
 			u8 characterID = data.characterIDs[driver->driverID];
 			podiumModelIndexArr[rank] = characterID + STATIC_CRASHDANCE;

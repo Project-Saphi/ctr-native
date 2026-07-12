@@ -4,7 +4,10 @@
 void UI_DrawSpeedNeedle(s16 posX, s16 posY, struct Driver *driver)
 {
 	int minScale = 0;
-	int maxScale = FP8_INT(driver->const_AccelSpeed_ClassStat) + FP8_INT(driver->const_SacredFireSpeed);
+	// NOTE(claude): Ghidra 0x800511c0 — retail sums the FP8 stats FIRST, then
+	// shifts ((stat + fire) >> 8); shifting each separately loses the carry
+	// from the low bytes.
+	int maxScale = (driver->const_AccelSpeed_ClassStat + driver->const_SacredFireSpeed) >> 8;
 	int speed = driver->speedometerNeedleValue;
 	int minAngle, maxAngle;
 	int accelSpeedInt = FP8_INT(driver->const_AccelSpeed_ClassStat);
@@ -53,7 +56,7 @@ void UI_DrawSpeedNeedle(s16 posX, s16 posY, struct Driver *driver)
 	{
 		yLen += FP8(2) - 1;
 	}
-	yLen /= FP8(2);
+	yLen >>= 9; // NOTE(claude): Ghidra 0x800511c0 - retail sra 9 after the +0x1ff fix-up; C division here double-corrected negatives past -511.
 	p->v[2].pos.x = posX + (FP_INT(sin[1] * needleWidth) + needleCenterX);
 	p->v[2].pos.y = posY + (yLen + needleCenterY);
 
@@ -62,7 +65,7 @@ void UI_DrawSpeedNeedle(s16 posX, s16 posY, struct Driver *driver)
 	{
 		yLen += FP8(2) - 1;
 	}
-	yLen /= FP8(2);
+	yLen >>= 9; // NOTE(claude): Ghidra 0x800511c0 - retail sra 9 after the +0x1ff fix-up; C division here double-corrected negatives past -511.
 	p->v[1].pos.x = posX - (FP_INT(sin[0] * needleWidth) - needleCenterX);
 	p->v[1].pos.y = posY - (yLen - needleCenterY);
 
@@ -71,7 +74,7 @@ void UI_DrawSpeedNeedle(s16 posX, s16 posY, struct Driver *driver)
 	{
 		yLen += FP8(2) - 1;
 	}
-	yLen /= FP8(2);
+	yLen >>= 9; // NOTE(claude): Ghidra 0x800511c0 - retail sra 9 after the +0x1ff fix-up; C division here double-corrected negatives past -511.
 	p->v[0].pos.x = posX + (FP_INT(sin[0] * needleHeight) + needleCenterX);
 	p->v[0].pos.y = posY + (yLen + needleCenterY);
 
@@ -91,7 +94,7 @@ void UI_DrawSpeedNeedle(s16 posX, s16 posY, struct Driver *driver)
 	{
 		yLen += FP8(2) - 1;
 	}
-	yLen /= FP8(2);
+	yLen >>= 9; // NOTE(claude): Ghidra 0x800511c0 - retail sra 9 after the +0x1ff fix-up; C division here double-corrected negatives past -511.
 	p->v[2].pos.x = posX - (FP_INT(sin[1] * needleWidth) - needleCenterX);
 	p->v[2].pos.y = posY - (yLen - needleCenterY);
 
@@ -100,7 +103,7 @@ void UI_DrawSpeedNeedle(s16 posX, s16 posY, struct Driver *driver)
 	{
 		yLen += FP8(2) - 1;
 	}
-	yLen /= FP8(2);
+	yLen >>= 9; // NOTE(claude): Ghidra 0x800511c0 - retail sra 9 after the +0x1ff fix-up; C division here double-corrected negatives past -511.
 	p->v[1].pos.x = posX - (FP_INT(sin[0] * needleWidth) - needleCenterX);
 	p->v[1].pos.y = posY - (yLen - needleCenterY);
 
@@ -109,22 +112,27 @@ void UI_DrawSpeedNeedle(s16 posX, s16 posY, struct Driver *driver)
 	{
 		yLen += FP8(2) - 1;
 	}
-	yLen /= FP8(2);
+	yLen >>= 9; // NOTE(claude): Ghidra 0x800511c0 - retail sra 9 after the +0x1ff fix-up; C division here double-corrected negatives past -511.
 	p->v[0].pos.x = posX + (FP_INT(sin[0] * needleHeight) + needleCenterX);
 	p->v[0].pos.y = posY + (yLen + needleCenterY);
 
 	AddPrimitive(p, sdata->gGT->pushBuffer_UI.ptrOT);
 }
 
+// NOTE(claude): Ghidra 0x800516ac — retail's band chain (2</4</7 thresholds on
+// the segment index) yields pairs GG, GG, GY, YR, RR, RR: the green→yellow→red
+// transition starts at the THIRD segment. The old {G,G,G,G,Y,R,R} table shifted
+// it one segment late. Retail yellow word is 0xd1ff (r=0xff,g=0xd1) — the old
+// MSVC fallback constant 0xffd1 also had the bytes swapped.
 #ifdef _MSC_VER
 
 #define SPEEDO_GREEN  0xb500
-#define SPEEDO_YELLOW 0xffd1
+#define SPEEDO_YELLOW 0xd1ff
 #define SPEEDO_RED    0xdb
 
 const Color DrawSpeedBG_Colors[7] = {
-    [0].self = SPEEDO_GREEN,  [1].self = SPEEDO_GREEN, [2].self = SPEEDO_GREEN, [3].self = SPEEDO_GREEN,
-    [4].self = SPEEDO_YELLOW, [5].self = SPEEDO_RED,   [6].self = SPEEDO_RED,
+    [0].self = SPEEDO_GREEN,  [1].self = SPEEDO_GREEN, [2].self = SPEEDO_GREEN, [3].self = SPEEDO_YELLOW,
+    [4].self = SPEEDO_RED,    [5].self = SPEEDO_RED,   [6].self = SPEEDO_RED,
 };
 
 #else
@@ -134,7 +142,7 @@ const Color DrawSpeedBG_Colors[7] = {
 #define SPEEDO_RED    MakeColor(0xdb, 0, 0)
 
 const Color DrawSpeedBG_Colors[7] = {
-    SPEEDO_GREEN, SPEEDO_GREEN, SPEEDO_GREEN, SPEEDO_GREEN, SPEEDO_YELLOW, SPEEDO_RED, SPEEDO_RED,
+    SPEEDO_GREEN, SPEEDO_GREEN, SPEEDO_GREEN, SPEEDO_YELLOW, SPEEDO_RED, SPEEDO_RED, SPEEDO_RED,
 };
 #endif
 
@@ -213,7 +221,9 @@ void UI_DrawSpeedBG(void)
 			return;
 		}
 
-		p->t.texpage = (Texpage){.code = 0xE1, .dither = 1};
+		// NOTE(claude): Ghidra 0x800516ac — retail's backing texpage word is
+		// 0xE1000A00: dither AND y_VRAM_EXP (bit 11), same as ClearBox.
+		p->t.texpage = (Texpage){.code = 0xE1, .dither = 1, .y_VRAM_EXP = 1};
 		p->p.tag.self = 0;
 
 		Color color = MakeColor(0, 0, 0);

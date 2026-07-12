@@ -53,9 +53,15 @@ struct ParticleEmitter emSet_OrcaSplash[7] = {
         {
             .flags = 0xB,
             .initOffset = 5,
+            // NOTE(claude): Ghidra 0x800b8174 (g_aEmSet_orcaSplash[4]) — the 0x64 belongs to
+            // rngSeed.startVal (emitter+0xC = 0x800b8180), NOT baseValue.accel (emitter+0xA).
+            // Binary bytes: baseValue={startVal=0x3E8, velocity=0x28, accel=0}, rngSeed={startVal=0x64,0,0}.
+            // Misplacing it gave splash axis[5] a constant accel of 0x64 and dropped the random
+            // startVal spread; corrected to match retail.
             .InitTypes.AxisInit =
                 {
-                    .baseValue = {.startVal = 0x3E8, .velocity = 0x28, .accel = 0x64},
+                    .baseValue = {.startVal = 0x3E8, .velocity = 0x28, .accel = 0},
+                    .rngSeed = {.startVal = 0x64},
                 },
         },
 

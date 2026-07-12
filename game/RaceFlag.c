@@ -268,8 +268,10 @@ void RaceFlag_DrawLoadingString(void)
 	int iVar9;
 	int iVar10;
 	u32 *uVar11;
-	char local_30;
-	char local_2f;
+	// NOTE(claude): Ghidra 0x800443c8 lbu+andi 0xff+sltiu — retail's 2-byte-glyph
+	// test is an UNSIGNED byte < 4; signed char would misparse bytes >= 0x80.
+	u8 local_30;
+	u8 local_2f;
 
 	pbVar7 = sdata->lngStrings[LNG_LOADING];
 
@@ -280,7 +282,9 @@ void RaceFlag_DrawLoadingString(void)
 	gGT->pushBuffer_UI.ptrOT = gGT->otSwapchainDB[gGT->swapchainIndex];
 
 	// get length of "LOADING..." string
-	iVar2 = 10;
+	// NOTE(claude): Ghidra 0x800442f4 jal strlen (loop bound in s6) — retail
+	// measures the localized string, not a hardcoded 10.
+	iVar2 = strlen(pbVar7);
 
 	iVar3 = DecalFont_GetLineWidth(pbVar7, 1);
 
@@ -356,10 +360,14 @@ void RaceFlag_DrawLoadingString(void)
 			}
 			if ((s16)iVar4 != 0x23c)
 			{
-				DecalFont_DrawLineStrlen(&local_30, uVar5, (iVar10 + iVar4), 0x6c, 1, 0);
+				// NOTE(claude): Ghidra 0x80044414 sll/sra 0x10 — retail truncates
+				// the X arg to s16; Transition&0xffff is ~64500 when the idle
+				// scroll goes negative, so the wrap is what slides the text off
+				// the LEFT edge (posX param is int, so truncate here).
+				DecalFont_DrawLineStrlen(&local_30, uVar5, (s16)(iVar10 + iVar4), 0x6c, 1, 0);
 			}
 
-			iVar4 = DecalFont_GetLineWidthStrlen(&local_30, uVar5, 1);
+			iVar4 = DecalFont_GetLineWidthStrlen((char *)&local_30, uVar5, 1);
 
 			iVar10 = iVar10 + iVar4;
 			iVar9 = iVar9 + 0xf0;
@@ -618,7 +626,10 @@ SKIP_LOADING_TEXT:
 
 	// === Rest of Iterations ===
 	// Now executing without branching
-	for (column = 1; column < 36; column++)
+	// NOTE(claude): Ghidra 0x80044e88 slti v0,s5,0x23 — retail's loop runs
+	// columns 1..34 (35 projected columns incl. the unrolled first), not 36;
+	// 36 drew one extra column strip past the retail flag edge.
+	for (column = 1; column < 35; column++)
 	{
 #if defined(CTR_NATIVE)
 		posL = &scratchpadBuf[(toggle * 0x78 / 4) - 1];
@@ -713,6 +724,18 @@ SKIP_LOADING_TEXT:
 				if (((posR[0] & posR[1] & posL[0] & posL[1] & screenlimit) == 0) &&
 				    ((dimensions - posR[0] & dimensions - posR[1] & dimensions - posL[0] & dimensions - posL[1] & screenlimit) == 0))
 				{
+					// NOTE(claude): Ghidra RaceFlag_DrawSelf re-reads backBuffer->primMem.curr
+					// and checks `curr <= endMin100` (guardEnd) before every POLY_G4, returning
+					// if the buffer is exhausted; this port emitted straight into `p` with no
+					// per-prim bound, so a flag drawn while primMem is near-full (it is shared
+					// with all other rendering) would overflow the prim buffer. Match retail:
+					// commit the cursor and stop when the guard is hit.
+					if ((char *)p > (char *)gGT->backBuffer->primMem.guardEnd)
+					{
+						gGT->backBuffer->primMem.cursor = p;
+						return;
+					}
+
 					// TRUE for gray, FALSE for white
 					u8 boolDark = (((column >> 2) + (i >> 2) & 1U) != 0);
 

@@ -35,21 +35,33 @@ void RB_GenericMine_ThTick(struct Thread *t)
 			inst->scale.x = 0x800;
 			inst->scale.y = 0x800;
 			inst->scale.z = 0x800;
-		}
-		else
-		{
-			// cooldown of 0.24s
-			mw->cooldown = 0xf0;
 
-			func = RB_Potion_ThTick_InAir;
+			// NOTE(claude): a thrown TNT tail-calls RB_TNT_ThTick_ThrowOffHead, which is
+			// terminal — it ends via ThTick_FastRET (0x80071694), the scheduler trampoline
+			// that restores the saved sp/ra/s0-s8 (@ 0x1f8000b0) and never returns to this
+			// frame. So the grounded pass below does NOT run for a thrown TNT. The native
+			// port drops ThTick_FastRET, so emulate that terminal-ness with a return here.
+			ThTick_SetAndExec(t, func);
+			return;
 		}
 
-		// this also quits the function
+		// cooldown of 0.24s
+		mw->cooldown = 0xf0;
+
+		func = RB_Potion_ThTick_InAir;
+
+		// NOTE(claude): Ghidra 0x800acbf4 `jal ThTick_SetAndExec` (0x800716ec) is a
+		// tail-call (jr through the fn-ptr, ra preserved). RB_Potion_ThTick_InAir ends in
+		// `jr ra` (0x800aca48), NOT ThTick_FastRET, so it returns to 0x800acbfc and falls
+		// straight through into the grounded pass below. Retail therefore runs the grounded
+		// pass — gravity, scale-grow, CollideWithDrivers — on the throw frame for a thrown
+		// potion/nitro; the prior `return` wrongly skipped it. Only the TNT branch above is
+		// terminal.
 		ThTick_SetAndExec(t, func);
-		return;
+		// fall through to the grounded pass
 	}
 
-	// === If not "thrown" ===
+	// === Grounded pass (also runs after InAir on a thrown potion/nitro) ===
 
 	// reduce cooldown
 	mw->cooldown -= gGT->elapsedTimeMS;
@@ -271,8 +283,12 @@ void RB_GenericMine_ThTick(struct Thread *t)
 				mw->deltaPos.z = 0;
 				mw->stopFallAtY = 0x3fff;
 
+				// NOTE(claude): Ghidra 0x800ad010 `jal ThTick_SetAndExec` then 0x800ad018
+				// `j 0x800ad17c` — the tail-call returns here and drops to the frameCount/
+				// boolDestroyed tail, it does NOT return. Match with goto (the prior
+				// `return` skipped this frame's parent-immunity countdown decrement).
 				ThTick_SetAndExec(t, RB_TNT_ThTick_ThrowOnHead);
-				return;
+				goto LAB_800ad17c;
 			}
 
 			// if this TNT has an InstDef, then it is part of LEV,

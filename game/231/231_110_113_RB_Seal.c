@@ -127,7 +127,14 @@ void RB_Seal_ThTick_TurnAround(struct Thread *t)
 		ConvertRotToMatrix(&sealInst->matrix, &sealObj->rotCurr.x);
 
 		ThTick_SetAndExec(t, RB_Seal_ThTick_Move);
-		return;
+
+		// NOTE(claude): Ghidra 0x800b8d14 — retail does NOT return here; the collision below is the
+		// common tail of BOTH branches. RB_Seal_ThTick_Move ends `jr ra` (0x800b90d0, non-terminal)
+		// and ThTick_SetAndExec is a tail-call, so after Move runs it returns into TurnAround's
+		// fall-through at 0x800b8d1c → Seal_CheckColl. The prior `return` skipped the seal's own
+		// post-transition collision pass in the turn-complete frame. Native ThTick_SetAndExec calls
+		// Move synchronously (PROC.c), so falling through reproduces retail's two collision passes
+		// (Move's + TurnAround's) that frame.
 	}
 
 	else
@@ -226,7 +233,14 @@ void RB_Seal_ThTick_Move(struct Thread *t)
 
 	// turn around
 	ThTick_SetAndExec(t, RB_Seal_ThTick_TurnAround);
-	return;
+
+	// NOTE(claude): Ghidra 0x800b8fd0 — retail falls through from SetAndExec(TurnAround) into the
+	// shared collision tail (LAB_800b8fdc @0x800b8fdc), exactly like the non-endpoint paths above
+	// that `goto` it. RB_Seal_ThTick_TurnAround ends `jr ra` (0x800b8e14, non-terminal), so after it
+	// runs, Move's own Seal_CheckColl still executes this frame. The prior `return` skipped it.
+	// Native ThTick_SetAndExec calls TurnAround synchronously (PROC.c), reproducing retail's
+	// collision pass in the turn-start frame.
+	Seal_CheckColl(sealInst, t, 1, 0x4000, 0x78);
 }
 
 void RB_Seal_LInB(struct Instance *inst)

@@ -115,8 +115,11 @@ void RR_EndEvent_UnlockAward(void)
 		sdata->relicTime_1sec = (relicTime / RR_RACE_TIME_ONE_SECOND) % 10;
 		sdata->relicTime_1ms = ((relicTime * 100) / RR_RACE_TIME_ONE_SECOND) % 10;
 
-		// [Not Done]
-		sdata->relicTime_10ms = 0;
+		// NOTE(claude): Ghidra 0x8009f948-0x8009fa60 (gold) / 0x8009fbac-0x8009fcc4
+		// (platinum) store FIVE relic-time digits; the 4th is (relicTime / 0x60) % 10
+		// — the tenths-of-a-second digit (0x60 = 96 = RR_RACE_TIME_ONE_SECOND/10). The
+		// prior `= 0` ("[Not Done]") dropped that digit from the displayed relic time.
+		sdata->relicTime_10ms = (relicTime / (RR_RACE_TIME_ONE_SECOND / 10)) % 10;
 	}
 }
 

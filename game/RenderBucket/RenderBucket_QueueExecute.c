@@ -2915,7 +2915,15 @@ static int RenderBucket_DrawInstPrim_LitTextureAtRange(struct RenderBucketDrawCo
 	}
 	else if (signedTest < 0)
 	{
-		codeWord = 0x24000000;
+		// NOTE(claude): Ghidra 0x8006c8ec `lui v1,0x2600` is the else-path code word, set
+		// UNCONDITIONALLY in the branch-delay slot of `bgez t2,0x8006c8f4` (0x8006c8e8). Retail emits
+		// code 0x26 (semi-transparent FT3) for BOTH signedTest sub-cases of the (tex->u1 &
+		// 0x600000)==0 path; only the tpage ABR differs (0x400000 backface asm 0x8006c8f0 `lui t0,0x40`
+		// / 0x200000 front 0x8006c8e4 `lui t0,0x20`). This branch had 0x24 (opaque), which drops the
+		// semi-trans bit so the tpage blend mode is ignored — backface lit-texture tris rendered
+		// opaque instead of blended. Corrected to 0x26. (Applies to both the direct LitTexture writer
+		// and its generated-split twin, both source-backing retail 0x8006c778.)
+		codeWord = 0x26000000;
 		tpageMask = 0x00400000;
 	}
 	else
@@ -3472,7 +3480,15 @@ static int RenderBucket_DrawSplitPrimitiveLitTextureAtRange(struct RenderBucketD
 	}
 	else if (signedTest < 0)
 	{
-		codeWord = 0x24000000;
+		// NOTE(claude): Ghidra 0x8006c8ec `lui v1,0x2600` is the else-path code word, set
+		// UNCONDITIONALLY in the branch-delay slot of `bgez t2,0x8006c8f4` (0x8006c8e8). Retail emits
+		// code 0x26 (semi-transparent FT3) for BOTH signedTest sub-cases of the (tex->u1 &
+		// 0x600000)==0 path; only the tpage ABR differs (0x400000 backface asm 0x8006c8f0 `lui t0,0x40`
+		// / 0x200000 front 0x8006c8e4 `lui t0,0x20`). This branch had 0x24 (opaque), which drops the
+		// semi-trans bit so the tpage blend mode is ignored — backface lit-texture tris rendered
+		// opaque instead of blended. Corrected to 0x26. (Applies to both the direct LitTexture writer
+		// and its generated-split twin, both source-backing retail 0x8006c778.)
+		codeWord = 0x26000000;
 		tpageMask = 0x00400000;
 	}
 	else
@@ -4747,7 +4763,11 @@ static int RenderBucket_PrepareDrawContext(struct RenderBucketDrawContext *ctx, 
 		*CTR_SCRATCHPAD_PTR(s16, 0xda) = idpp->splitLine;
 		*CTR_SCRATCHPAD_PTR(s16, 0xf2) = idpp->splitLine;
 		*CTR_SCRATCHPAD_PTR(u8, 0x48) = (u8)inst->unk53;
-		*CTR_SCRATCHPAD_PTR(u32, 0x4c) = (u32)(uintptr_t)inst->funcPtr[3];
+		// NOTE(claude): Ghidra RenderBucket_Execute 0x8006aaa8 stores `*(iInst + 0x58)`
+		// to scratch 0x4c; inst+0x58 is reflectionRGBA (funcPtr[3] is inst+0x68), so the
+		// prior funcPtr[3] read was the wrong field. Dead write today (native reads
+		// reflectionRGBA directly), but corrected to match retail scratch state.
+		*CTR_SCRATCHPAD_PTR(u32, 0x4c) = inst->reflectionRGBA;
 		*CTR_SCRATCHPAD_PTR(u32, 0x11c) = ((u32)(s32)idpp->splitLine) << 17;
 		*CTR_SCRATCHPAD_PTR(u32, 0xe0) = 0;
 		*CTR_SCRATCHPAD_PTR(u32, 0xf8) = 0;

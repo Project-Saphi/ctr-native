@@ -406,8 +406,15 @@ void MainInit_FinalizeInit(struct GameTracker *gGT)
 	gGT->pushBuffer[0].distanceToScreen_CURR = 0x100;
 
 	// reset root thread for each bucket
-	for (int i = 0; i < NUM_BUCKETS; i++)
-		gGT->threadBuckets[i].thread = 0;
+	// NOTE(claude): Ghidra 0x8003b970 — retail memsets the whole 0x168-byte
+	// bucket table, then installs the profiler name/colour strings (debug-only,
+	// omitted here) and boolCantPause=1 for STATIC/WARPPAD/CAMERA/HUD, which
+	// MainFrame_GameLogic's DEBUG_MENU gate reads; the project never set them.
+	memset(gGT->threadBuckets, 0, sizeof(gGT->threadBuckets));
+	gGT->threadBuckets[STATIC].boolCantPause = 1;
+	gGT->threadBuckets[WARPPAD].boolCantPause = 1;
+	gGT->threadBuckets[CAMERA].boolCantPause = 1;
+	gGT->threadBuckets[HUD].boolCantPause = 1;
 
 	// particles
 	gGT->particleList_ordinary = NULL;
@@ -580,7 +587,12 @@ void MainInit_FinalizeInit(struct GameTracker *gGT)
 	gGT->stars.distance = lev1->stars.distance;
 
 	// confetti
+	// NOTE(claude): Ghidra 0x8003b934 (FinalizeInit) — retail zeroes the WHOLE
+	// confetti descriptor here: numParticles_curr, unk1, numParticles_max, unk2
+	// (nParticleRampStep) and velY. The project omitted confetti.unk1 ("previous
+	// frame?"), leaving it stale across loads since FinalizeInit runs per-load.
 	gGT->confetti.numParticles_curr = 0;
+	gGT->confetti.unk1 = 0;
 	gGT->confetti.numParticles_max = 0;
 	gGT->confetti.unk2 = 0;
 	gGT->confetti.velY = -10;

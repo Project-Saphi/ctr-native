@@ -73,10 +73,13 @@ void RECTMENU_DrawRwdBlueRect_Subset(s16 *pos, int *color, u_long *ot, struct Pr
 
 		p->code = 0x38;
 
+		// NOTE(claude): Ghidra 0x80045134 — retail masks the packed low (X) half
+		// (andi 0xffff / ushort cast); without it a negative x (menu sliding in
+		// from offscreen) sign-extends and clobbers the packed Y half.
 		*(int *)&p->x0 = *(int *)&pos[0];
-		*(int *)&p->x1 = (pos[0] + pos[2]) | (pos[1] << 16);
-		*(int *)&p->x2 = pos[0] | ((pos[1] + pos[3]) << 16);
-		*(int *)&p->x3 = (pos[0] + pos[2]) | ((pos[1] + pos[3]) << 16);
+		*(int *)&p->x1 = ((pos[0] + pos[2]) & 0xffff) | (pos[1] << 16);
+		*(int *)&p->x2 = (u16)pos[0] | ((pos[1] + pos[3]) << 16);
+		*(int *)&p->x3 = ((pos[0] + pos[2]) & 0xffff) | ((pos[1] + pos[3]) << 16);
 
 		*(int *)p = (*(int *)ot & 0xffffff) | 0x8000000;
 		*(int *)ot = (int)CtrGpu_PrimToOTLink24(p);
@@ -217,7 +220,13 @@ void RECTMENU_DrawQuip(char *comment, s16 startX, int startY, u32 sizeX, s16 fon
 	if ((textFlag & 0x8000) != 0)
 	{
 		// posX with text un-centered
-		posX = startX - (sizeX >> 1);
+		// NOTE(claude): Ghidra 0x800456f8-0x80045700 `sll v1,a0,0x10; sra v0,v1,0x10;
+		// srl v1,v1,0x1f` (then addu v0,v0,v1; sra v0,v0,1) — retail truncates sizeX to
+		// s16 and halves it as a SIGNED value (round toward zero). The old `sizeX >> 1`
+		// was an unsigned u32 shift: for a width with bit 15 set (or any bits above 16)
+		// it diverges. All real quip widths are small positives, so unobservable today;
+		// cast to (s16) and divide to stay bit-exact with retail's sra.
+		posX = startX - ((s16)sizeX / 2);
 	}
 
 	sizeY = (u32)data.PlayerCommentBoxParams[fontType];
@@ -755,6 +764,25 @@ int RECTMENU_ProcessInput(struct RectMenu *m)
 
 	RngDeadCoed(&sdata->const_0x30215400);
 
+	// NOTE(claude): Ghidra 0x800465a0-0x800465c4 — retail claims activeSubMenu
+	// (and first-touch-clears input) BEFORE loading the tap buttons at
+	// 0x800465e0, so the press that opened a menu is swallowed on its opening
+	// frame; reading the buttons first let stale input navigate the fresh
+	// menu immediately.
+	if (((m->state & ONLY_DRAW_TITLE) == 0) && ((m->state & 0x60000) != 0x60000))
+	{
+		if (sdata->activeSubMenu != m)
+		{
+			sdata->activeSubMenu = m;
+
+			// if input should clear upon opening
+			if ((m->state & KEEP_INPUTS_IN_SUBMENU) == 0)
+			{
+				RECTMENU_ClearInput();
+			}
+		}
+	}
+
 	// button from any player
 	button = sdata->AnyPlayerTap;
 
@@ -785,17 +813,6 @@ int RECTMENU_ProcessInput(struct RectMenu *m)
 
 		currMenuRow = &m->rows[oldRow];
 
-		if (sdata->activeSubMenu != m)
-		{
-			sdata->activeSubMenu = m;
-
-			// if input should clear upon opening
-			if ((m->state & KEEP_INPUTS_IN_SUBMENU) == 0)
-			{
-				RECTMENU_ClearInput();
-			}
-		}
-
 		// optimized way to check all four button presses:
 		// up, down, left, right, and get new row
 		for (i = 0; i < 4; i++)
@@ -817,11 +834,15 @@ int RECTMENU_ProcessInput(struct RectMenu *m)
 			}
 		}
 
-		if ((button & (BTN_CROSS | BTN_CIRCLE)) == 0)
+		// NOTE(claude): Ghidra 0x80046680 andi 0x50 / 0x80046754 ori 0x40020 —
+		// retail's select/back masks use only the remapped bits (CROSS_one
+		// 0x10, SQUARE_one 0x20); the composite BTN_CROSS/BTN_SQUARE also
+		// include the raw 0x4000/0x8000 bits retail does not test here.
+		if ((button & (BTN_CROSS_one | BTN_CIRCLE)) == 0)
 		{
 			if (
 			    // if Triangle or Square
-			    ((button & (BTN_TRIANGLE | BTN_SQUARE)) != 0) &&
+			    ((button & (BTN_TRIANGLE | BTN_SQUARE_one)) != 0) &&
 
 			    // if this is not the top of the menu
 			    ((m->state & MENU_CANT_GO_BACK) == 0))
@@ -948,7 +969,11 @@ void RECTMENU_ProcessState()
 		currMenu->unk1e = 1;
 		currMenu->funcPtr(currMenu);
 
-		// check if funcPtr changed "state"
+		// NOTE(claude): Ghidra 0x800468b0/0x800468d4/0x80046910/0x80046960 —
+		// retail reloads ptrActiveMenu AND its state before every following
+		// check; a funcPtr calling RECTMENU_Show() mid-frame redirects the
+		// rest of the tick to the new menu.
+		currMenu = sdata->ptrActiveMenu;
 		state = currMenu->state;
 	}
 
@@ -959,6 +984,7 @@ void RECTMENU_ProcessState()
 		RECTMENU_ProcessInput(currMenu);
 
 		// check if ProcessInput changed "state"
+		currMenu = sdata->ptrActiveMenu;
 		state = currMenu->state;
 
 		// if Menu border is not invisible
@@ -972,6 +998,11 @@ void RECTMENU_ProcessState()
 			RECTMENU_DrawSelf(currMenu, 0, 0, (int)width);
 		}
 	}
+
+	// NOTE(claude): Ghidra 0x80046910/0x80046960 — fresh reload before the
+	// 0x800 and NEEDS_TO_CLOSE checks (DrawSelf-phase funcPtrs can Show/Hide).
+	currMenu = sdata->ptrActiveMenu;
+	state = currMenu->state;
 
 	// not sure what this is
 	if ((state & 0x800) == 0)

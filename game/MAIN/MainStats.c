@@ -64,16 +64,22 @@ void MainStats_RestartRaceCountLoss(void)
 		return;
 	}
 
-	// not in boss
-	index = gGT->levelID;
-	countPtr = &sdata->advProgress.timesLostRacePerLev[0];
-
 	if (IS_BOSS_RACE(gameMode1))
 	{
 		// in boss
-		index = gGT->bossID;
-		countPtr = &sdata->advProgress.timesLostBossRace[0];
+		// NOTE(claude): Ghidra 0x8003d144 — retail stores and returns only
+		// when the boss counter is below the cap; at 10 it FALLS THROUGH into
+		// the level path below and bumps timesLostRacePerLev[levelID] instead.
+		if (sdata->advProgress.timesLostBossRace[gGT->bossID] < 10)
+		{
+			sdata->advProgress.timesLostBossRace[gGT->bossID]++;
+			return;
+		}
 	}
+
+	// not in boss (or boss counter capped)
+	index = gGT->levelID;
+	countPtr = &sdata->advProgress.timesLostRacePerLev[0];
 
 	if (countPtr[index] < 10)
 		countPtr[index]++;
